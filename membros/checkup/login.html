@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entrar — Área do Check-up | Regiane Silva</title>
+<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<canvas id="grain-canvas"></canvas>
+<div class="grid-bg"></div>
+<div class="scan-line"></div>
+<div class="c-dot" id="cdot"></div>
+<div class="c-ring" id="cring"></div>
+
+<div id="loader">
+  <div class="loader-mark">Regiane Silva</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<div class="auth-shell">
+  <div class="hero-glow" style="top:30%;"></div>
+  <div class="auth-card reveal in">
+    <div class="auth-logo">
+      <div class="lg-name">Regiane Silva</div>
+      <span class="lg-sub">Área do Check-up</span>
+    </div>
+    <h1 class="auth-title">Seu resultado te espera</h1>
+    <p class="auth-sub">Entre para ver o resultado do seu Check-up Alimentar Funcional.</p>
+
+    <div class="auth-error" id="auth-error">E-mail ou senha incorretos. Use a conta de demonstração abaixo.</div>
+
+    <form id="login-form">
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" placeholder="voce@email.com" value="checkup@demo.com" required />
+      </div>
+      <div class="field">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" placeholder="••••••••" value="demo123" required />
+      </div>
+      <button type="submit" class="btn btn-primary auth-submit">Entrar &nbsp;→</button>
+    </form>
+
+    <div class="auth-demo">✦ Conta de demonstração já preenchida — apenas clique em <strong>Entrar</strong>.</div>
+
+    <p class="auth-foot">Já é paciente do programa? <a href="../programa/login.html">Acesse por aqui</a></p>
+    <p class="auth-foot" style="margin-top:6px;"><a href="../index.html">← Voltar para a escolha de área</a></p>
+  </div>
+</div>
+
+<script src="../../assets/js/main.js"></script>
+<script>
+  document.getElementById('login-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value.trim();
+    const err = document.getElementById('auth-error');
+    if(email && senha){
+      sessionStorage.setItem('rs_checkup_email', email);
+      window.location.href = 'dashboard.html';
+    } else {
+      err.classList.add('show');
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entrar — Área do Programa | Regiane Silva</title>
+<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<canvas id="grain-canvas"></canvas>
+<div class="grid-bg"></div>
+<div class="scan-line"></div>
+<div class="c-dot" id="cdot"></div>
+<div class="c-ring" id="cring"></div>
+
+<div id="loader">
+  <div class="loader-mark">Regiane Silva</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<div class="auth-shell">
+  <div class="hero-glow" style="top:30%;"></div>
+  <div class="auth-card reveal in">
+    <div class="auth-logo">
+      <div class="lg-name">Regiane Silva</div>
+      <span class="lg-sub">Área do Programa</span>
+    </div>
+    <h1 class="auth-title">Bem-vinda de volta</h1>
+    <p class="auth-sub">Entre para acessar seu acompanhamento, comunidade, aulas e materiais.</p>
+
+    <div class="auth-error" id="auth-error">E-mail ou senha incorretos. Use a conta de demonstração abaixo.</div>
+
+    <form id="login-form">
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" placeholder="voce@email.com" value="paciente@demo.com" required />
+      </div>
+      <div class="field">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" placeholder="••••••••" value="demo123" required />
+      </div>
+      <button type="submit" class="btn btn-primary auth-submit">Entrar &nbsp;→</button>
+    </form>
+
+    <div class="auth-demo">✦ Conta de demonstração já preenchida — apenas clique em <strong>Entrar</strong>.</div>
+
+    <p class="auth-foot">Fez apenas o Check-up? <a href="../checkup/login.html">Acesse por aqui</a></p>
+    <p class="auth-foot" style="margin-top:6px;"><a href="../index.html">← Voltar para a escolha de área</a></p>
+  </div>
+</div>
+
+<script src="../../assets/js/api.js"></script>
+<script src="../../assets/js/main.js"></script>
+<script>
+  document.getElementById('login-form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value.trim();
+    const err = document.getElementById('auth-error');
+    const btn = document.querySelector('.auth-submit');
+    err.classList.remove('show');
+
+    if(!email || !senha){
+      err.textContent = 'Preencha e-mail e senha.';
+      err.classList.add('show');
+      return;
+    }
+
+    if(!apiConfigured()){
+      // Backend ainda não publicado: modo demonstração, qualquer e-mail/senha entra.
+      sessionStorage.setItem('rs_programa_email', email);
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
+    const result = await apiGet('login', { email: email });
+    btn.disabled = false;
+    btn.innerHTML = 'Entrar &nbsp;→';
+
+    if(result.ok){
+      sessionStorage.setItem('rs_programa_email', result.email);
+      sessionStorage.setItem('rs_programa_nome', result.nome || '');
+      window.location.href = 'dashboard.html';
+    } else {
+      err.textContent = result.error || 'E-mail ou senha incorretos.';
+      err.classList.add('show');
+    }
+  });
+</script>
+</body>
+</html>

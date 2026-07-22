@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Regiane Silva — Nutrição Funcional | Investigar antes de restringir</title>
+<meta name="description" content="Regiane Silva, nutricionista funcional em Arujá/SP. Investigação personalizada para encontrar a verdadeira causa dos seus sintomas — o emagrecimento vem como consequência." />
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+<!-- ── fixed elements ── -->
+<canvas id="bg-canvas"></canvas>
+<canvas id="grain-canvas"></canvas>
+<div class="grid-bg"></div>
+<div class="scan-line"></div>
+<div class="c-dot" id="cdot"></div>
+<div class="c-ring" id="cring"></div>
+
+<!-- ── loader ── -->
+<div id="loader">
+  <div class="loader-mark">Regiane Silva</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<!-- ── nav ── -->
+<nav>
+  <div class="nav-inner">
+    <a href="#home" class="nav-logo">
+      <span class="lg-name">Regiane Silva</span>
+      <span class="lg-sub">Nutrição Funcional</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#perspectiva">Perspectiva</a></li>
+      <li><a href="#metodo">Método</a></li>
+      <li><a href="#produtos">Programas</a></li>
+      <li><a href="#sobre">Sobre</a></li>
+      <li><a href="#local">Onde estou</a></li>
+      <li><a href="membros/index.html" class="nav-cta">✦ Área de Membros</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Abrir menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════ HERO ══════════════════════════════ -->
+<section class="hero" id="home">
+  <svg class="hero-rings" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+    <circle class="orbit orbit-1" cx="500" cy="500" r="440"/>
+    <circle class="orbit orbit-2" cx="500" cy="500" r="310"/>
+    <circle class="orbit orbit-3" cx="500" cy="500" r="190" stroke-width=".3"/>
+  </svg>
+  <div class="hero-glow"></div>
+
+  <p class="hero-eyebrow reveal">Nutrição Funcional · Arujá/SP</p>
+  <h1 class="h1 reveal">
+    Você não precisa lutar<br>contra o seu corpo.
+    <em>Precisa entender por que ele parou de funcionar.</em>
+  </h1>
+  <p class="lead reveal">Independentemente do sintoma que trouxe você até aqui — dificuldade para emagrecer, diabetes, intestino desregulado, menopausa, hipertensão ou outro problema de saúde — meu trabalho é investigar a verdadeira causa do desequilíbrio do seu organismo. Porque quando o corpo volta a funcionar como deveria, a saúde deixa de ser uma luta e passa a ser consequência.</p>
+  <div class="hero-actions">
+    <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Vim%20pelo%20site%20e%20quero%20come%C3%A7ar%20minha%20investiga%C3%A7%C3%A3o." target="_blank" rel="noopener" class="btn btn-primary reveal">Quero começar minha investigação &nbsp;→</a>
+    <a href="#sobre" class="btn btn-outline reveal">Sobre mim</a>
+  </div>
+
+  <div class="scroll-hint" aria-hidden="true">
+    <span>Rolar</span>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2v10M3 8l4 4 4-4"/></svg>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ IDENTIFICAÇÃO ══════════════════════════════ -->
+<section data-step="1">
+  <div class="container">
+    <div class="sec-divider"><span class="num">01 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Vamos começar por aqui</div>
+    <h2 class="h2 reveal" style="max-width:640px;margin-bottom:8px;">Com qual destes problemas você convive hoje?</h2>
+
+    <div class="id-grid">
+      <div class="id-pill reveal"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Emagrecimento difícil</div>
+      <div class="id-pill reveal d1"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Diabetes</div>
+      <div class="id-pill reveal d2"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Hipertensão</div>
+      <div class="id-pill reveal d3"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Colesterol alto</div>
+      <div class="id-pill reveal d4"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Intestino preso ou inflamado</div>
+      <div class="id-pill reveal d5"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Bariátrica</div>
+      <div class="id-pill reveal"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Doença renal</div>
+      <div class="id-pill reveal d1"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Menopausa</div>
+      <div class="id-pill reveal d2"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Ganho de massa</div>
+      <div class="id-pill reveal d3"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Cansaço constante</div>
+      <div class="id-pill reveal d4"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Inflamação</div>
+      <div class="id-pill reveal d5"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Alimentação infantil</div>
+    </div>
+
+    <p class="reveal" style="font-size:16px;font-weight:600;color:var(--marsala-deep);max-width:640px;line-height:1.7;margin-top:12px;">
+      Embora os sintomas sejam diferentes, muitas vezes a origem do problema é a mesma: um organismo em desequilíbrio.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ PERSPECTIVA ══════════════════════════════ -->
+<section id="perspectiva" data-step="2">
+  <div class="container">
+    <div class="sec-divider"><span class="num">02 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Minha Perspectiva</div>
+    <h2 class="h2 reveal" style="max-width:680px;margin-bottom:18px;">Seu corpo não está falhando. Ele está tentando avisar você.</h2>
+    <p class="lead reveal">Várias pacientes já tentaram, antes do meu tratamento:</p>
+
+    <div class="tried-grid">
+      <div class="tried-pill slide-l">Dietas restritivas<span class="strike"></span></div>
+      <div class="tried-pill slide-r d1">Cortar grupos alimentares<span class="strike"></span></div>
+      <div class="tried-pill slide-l d1">Protocolos prontos<span class="strike"></span></div>
+      <div class="tried-pill slide-r d2">Modismos nutricionais<span class="strike"></span></div>
+    </div>
+
+    <p class="reveal" style="font-size:17px;font-weight:500;color:var(--ink-soft);max-width:640px;line-height:1.78;margin-top:16px;">
+      E mesmo assim seguem sem resultado. Isso acontece porque tratar sintomas nunca resolve a causa — e cada corpo possui uma história diferente.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ MECANISMO ÚNICO ══════════════════════════════ -->
+<section id="metodo" data-step="3">
+  <div class="container-sm">
+    <div class="sec-divider"><span class="num">03 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Meu Mecanismo Único</div>
+    <h2 class="h2 reveal" style="max-width:620px;margin-bottom:14px;">Eu investigo antes de restringir</h2>
+    <p class="lead reveal" style="max-width:560px;">Não trabalho com protocolos prontos. Cada corpo possui uma história diferente — e o caminho até o equilíbrio segue uma investigação clara, passo a passo.</p>
+
+    <div class="timeline">
+      <div class="timeline-step reveal"><span class="tn">1</span><div class="timeline-card">Investigação</div></div>
+      <div class="timeline-step reveal d1"><span class="tn">2</span><div class="timeline-card">Interpretação</div></div>
+      <div class="timeline-step reveal d2"><span class="tn">3</span><div class="timeline-card">Descoberta da causa</div></div>
+      <div class="timeline-step reveal d3"><span class="tn">4</span><div class="timeline-card">Plano personalizado</div></div>
+      <div class="timeline-step reveal d4"><span class="tn">5</span><div class="timeline-card">Organismo em equilíbrio</div></div>
+      <div class="timeline-step reveal d5"><span class="tn">6</span><div class="timeline-card">Resultados</div></div>
+    </div>
+
+    <p class="reveal" style="margin-top:8px;font-size:15.5px;color:var(--ink-soft);line-height:1.75;text-align:center;">
+      Os resultados — energia, digestão, emagrecimento saudável — aparecem naturalmente, como consequência.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ QUEM CHEGA ATÉ MIM ══════════════════════════════ -->
+<section data-step="4">
+  <div class="container">
+    <div class="sec-divider"><span class="num">04 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Talvez você se reconheça aqui</div>
+    <h2 class="h2 reveal" style="max-width:560px;margin-bottom:0;">Quem normalmente chega até mim</h2>
+
+    <div class="quotes-grid">
+      <div class="quote-pill reveal d1">Já tentei inúmeras dietas.</div>
+      <div class="quote-pill reveal d2">Tenho exames alterados.</div>
+      <div class="quote-pill reveal d3">Meu médico disse para procurar uma nutricionista.</div>
+      <div class="quote-pill reveal d4">Estou cansada de tratar sintomas.</div>
+      <div class="quote-pill reveal d1">Quero emagrecer sem viver em dieta.</div>
+      <div class="quote-pill reveal d2">Minha doença exige uma alimentação específica.</div>
+      <div class="quote-pill reveal d3">Meu intestino vive desregulado.</div>
+      <div class="quote-pill reveal d4">Minha saúde piorou depois da menopausa.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ CRENÇAS ══════════════════════════════ -->
+<section data-step="5">
+  <div class="container-sm">
+    <div class="sec-divider"><span class="num">05 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">O que eu acredito</div>
+    <h2 class="h2 reveal" style="max-width:560px;margin-bottom:0;">Não existe dieta universal. Existe o seu organismo.</h2>
+
+    <div class="beliefs-split">
+      <div class="belief-col reveal d1">
+        <h4>Eu acredito</h4>
+        <ul class="belief-list yes">
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Saúde começa no equilíbrio.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>O intestino influencia todo o organismo.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Emagrecer é consequência de um organismo saudável.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Cada organismo responde de maneira diferente.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Sintomas nunca aparecem por acaso.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Prevenir é sempre melhor do que remediar.</li>
+        </ul>
+      </div>
+      <div class="belief-col reveal d2">
+        <h4>Eu não acredito</h4>
+        <ul class="belief-list no">
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Dieta pronta ou copiada.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Emagrecimento rápido.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Terrorismo alimentar.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Modismos e protocolos iguais para todos.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Cortar alimentos sem investigar.</li>
+          <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Tratar somente o sintoma.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ TRANSFORMAÇÃO ══════════════════════════════ -->
+<section data-step="6">
+  <div class="container">
+    <div class="sec-divider"><span class="num">06 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Transformação</div>
+    <h2 class="h2 reveal" style="max-width:600px;margin-bottom:14px;">Quando você entende a causa, o corpo volta a jogar a seu favor</h2>
+    <p class="lead reveal" style="max-width:600px;">A promessa é simples: entender a verdadeira causa do problema para que o organismo funcione ao seu favor.</p>
+    <p class="reveal" style="font-size:15.5px;font-weight:600;color:var(--marsala-deep);max-width:600px;line-height:1.7;margin-top:10px;">
+      Quando encontramos a causa, tratar os sintomas deixa de ser o objetivo. Eles começam a desaparecer como consequência.
+    </p>
+
+    <div class="ba-grid">
+      <div class="ba-col before reveal d1">
+        <h4>Antes</h4>
+        <div class="ba-item">"Já tentei de tudo."</div>
+        <div class="ba-item">"Faço dieta e nada funciona."</div>
+        <div class="ba-item">"Meu intestino vive preso."</div>
+        <div class="ba-item">"Estou sempre cansada, sempre inchada."</div>
+        <div class="ba-item">"Cada profissional fala uma coisa."</div>
+      </div>
+      <div class="ba-col after reveal d2">
+        <h4>Depois</h4>
+        <div class="ba-item">"Agora eu entendo meu corpo."</div>
+        <div class="ba-item">"Finalmente descobri a causa."</div>
+        <div class="ba-item">"Meu metabolismo voltou a funcionar."</div>
+        <div class="ba-item">"Tenho energia e emagreço sem sofrimento."</div>
+        <div class="ba-item">"Tenho autonomia para cuidar da minha saúde."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ COMO PODEMOS CAMINHAR JUNTOS ══════════════════════════════ -->
+<section id="produtos" data-step="7">
+  <div class="container">
+    <div class="sec-divider"><span class="num">07 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Nossa Jornada Juntas</div>
+    <h2 class="h2 reveal" style="max-width:640px;margin-bottom:14px;">Como podemos caminhar juntas</h2>
+    <p class="lead reveal" style="max-width:620px;">Seis passos — cada um pensado para o momento exato da sua jornada, para que nenhum passo fique sem próximo passo.</p>
+
+    <div class="ladder-track">
+      <div class="ladder-card reveal">
+        <div class="ladder-step">1</div>
+        <div class="ladder-tag">Descubra</div>
+        <h3 class="h3">Check-up Alimentar Funcional</h3>
+        <p class="ladder-goal">Gerar consciência sobre o problema e te preparar para uma avaliação individual.</p>
+        <p class="ladder-desc">Você responde um questionário sobre um sintoma específico e recebe, na hora, uma leitura inicial e um plano de melhorias para começar a agir hoje mesmo.</p>
+        <p class="ladder-promise">"Descubra quais hábitos estão impedindo sua saúde de evoluir."</p>
+      </div>
+      <div class="ladder-card reveal d1">
+        <div class="ladder-step">2</div>
+        <div class="ladder-tag">Entenda</div>
+        <h3 class="h3">Consultoria Estratégica Nutricional</h3>
+        <p class="ladder-goal">Gerar confiança e te direcionar para o tratamento ideal.</p>
+        <p class="ladder-desc">Conversa estratégica individual comigo: avalio seus objetivos e identifico o principal gargalo, com orientações práticas para você já começar a evoluir. Sem plano alimentar, sem cardápio, sem solicitação de exames.</p>
+        <p class="ladder-promise">"Em apenas 30 minutos, descubra qual é o principal obstáculo que está impedindo seus resultados."</p>
+      </div>
+      <div class="ladder-card featured reveal d2">
+        <div class="ladder-step">3</div>
+        <div class="ladder-tag">Investigue</div>
+        <h3 class="h3">Consulta Funcional Completa</h3>
+        <p class="ladder-goal">Diagnosticar profundamente o problema e iniciar o tratamento.</p>
+        <p class="ladder-desc">Consulta dupla: história clínica completa, solicitação e avaliação de exames, plano alimentar totalmente personalizado. Para casais e famílias, o combo sai em condição especial.</p>
+        <p class="ladder-promise">"A verdadeira causa dos seus sintomas, investigada a fundo."</p>
+      </div>
+      <div class="ladder-card reveal d3">
+        <div class="ladder-step">4</div>
+        <div class="ladder-tag">Reequilibre</div>
+        <h3 class="h3">Programa Reequilíbrio Funcional</h3>
+        <p class="ladder-goal">Consolidar os resultados através de um acompanhamento próximo, por 90 dias.</p>
+        <p class="ladder-desc">3 consultas + retorno estratégico, sua área de membros com aulas em vídeo, receitas de bastidor, o quadro "Raio-X do Rótulo" (te ensino a ler a informação nutricional dos produtos) e um sistema de pontos: cada foto de resultado que você envia vira crédito para seus próximos passos comigo.</p>
+        <p class="ladder-promise">"Transforme sua alimentação em um hábito sustentável."</p>
+      </div>
+      <div class="ladder-card reveal d4">
+        <div class="ladder-step">5</div>
+        <div class="ladder-tag">Mantenha</div>
+        <h3 class="h3">Clube Vida Funcional</h3>
+        <p class="ladder-goal">Manter o relacionamento e aumentar seu tempo de cuidado comigo.</p>
+        <p class="ladder-desc">Assinatura mensal com acesso ao meu conteúdo exclusivo direto no Instagram — bastidor, receitas, desafios e dicas, sem sair do app que você já usa todo dia.</p>
+        <p class="ladder-promise">"Continue cuidando da sua saúde, com apoio contínuo."</p>
+      </div>
+      <div class="ladder-card reveal d5">
+        <div class="ladder-step">6</div>
+        <div class="ladder-tag">Evolua</div>
+        <h3 class="h3">Mentoria Saúde em Equilíbrio</h3>
+        <p class="ladder-goal">Um acompanhamento premium para quem deseja máxima personalização.</p>
+        <p class="ladder-desc">Retornos prioritários, revisão frequente de exames, ajustes constantes e suporte direto na sua área de membros — com a opção de incluir orientação de parceiros como personal trainer.</p>
+        <p class="ladder-promise">"Acompanhamento intensivo para acelerar seus resultados."</p>
+      </div>
+    </div>
+
+    <p class="reveal" style="margin-top:32px;font-size:13.5px;color:var(--muted);max-width:620px;">✦ Vocês são casal, mãe e filha, ou família? Pergunte sobre o combo — condição especial pensada para quem cuida da saúde junto.</p>
+
+    <div style="text-align:center;margin-top:32px;">
+      <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Vim%20pelo%20site%20e%20quero%20come%C3%A7ar%20minha%20investiga%C3%A7%C3%A3o." target="_blank" rel="noopener" class="btn btn-primary reveal">Quero começar minha investigação &nbsp;→</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ PROVAS / DEPOIMENTOS ══════════════════════════════ -->
+<section data-step="8">
+  <div class="container-center">
+    <div class="sec-divider"><span class="num">08 / 09</span><div class="line"></div></div>
+    <div class="sec-tag reveal">Provas</div>
+    <h2 class="h2 reveal" style="margin:0 auto 8px;">Quem já passou por aqui</h2>
+    <p class="lead reveal" style="max-width:480px;margin:0 auto;">Avaliações reais, direto do Google.</p>
+
+    <div class="testi-carousel reveal">
+      <div class="testi-slide active">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Eu adoro a nutri! Ela é super flexível, faz uma avaliação bem completa para montar o plano alimentar, que é super tranquilo de seguir. Além disso, ela realmente escuta nossas necessidades e adapta tudo à nossa rotina, o que faz toda a diferença no dia a dia."</p>
+        <div class="testi-name">Geovana Kuwahara</div>
+        <div class="testi-src">Avaliação no Google</div>
+      </div>
+      <div class="testi-slide">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Não tenho palavras pra agradecer tudo que ela fez por mim. Excelente profissional, muito obrigada por toda atenção e cuidado."</p>
+        <div class="testi-name">Elisete Barbosa</div>
+        <div class="testi-src">Avaliação no Google</div>
+      </div>
+      <div class="testi-slide">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Ótimo atendimento, eu indico para todos os meus amigos. Além da consulta presencial, ela faz atendimento online."</p>
+        <div class="testi-name">Beatriz Oliveira</div>
+        <div class="testi-src">Avaliação no Google</div>
+      </div>
+      <div class="testi-slide">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Foi maravilhoso, o atendimento, o cuidado, tudo excelente, recomendo demais. Poucos dias e meu corpo já é outro."</p>
+        <div class="testi-name">Laura Salgueiro</div>
+        <div class="testi-src">Avaliação no Google</div>
+      </div>
+      <div class="testi-slide">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Ótima nutri, atenciosa e está me ajudando na reeducação alimentar, além de preparar um plano alimentar incrível, individual e que atende todas as nossas necessidades. Ajudando a alcançar nossos resultados de forma saudável!"</p>
+        <div class="testi-name">Geovana Gabriely</div>
+        <div class="testi-src">Avaliação no Google</div>
+      </div>
+      <div class="testi-slide">
+        <div class="testi-google">★ Google · Avaliação verificada</div>
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Quero deixar aqui um agradecimento especial à minha nutricionista, que tem me ajudado a entender meu corpo e a melhorar minha saúde de forma incrível. Agradeço muito o trabalho e paciência da Rê. As consultas vão muito além da nutrição do corpo — recomendo demais."</p>
+        <div class="testi-name">Mariane Souza</div>
+        <div class="testi-src">Avaliação no Google · Local Guide</div>
+      </div>
+    </div>
+    <div class="testi-dots">
+      <button class="testi-dot active"></button>
+      <button class="testi-dot"></button>
+      <button class="testi-dot"></button>
+      <button class="testi-dot"></button>
+      <button class="testi-dot"></button>
+      <button class="testi-dot"></button>
+    </div>
+
+    <div style="margin-top:32px;">
+      <a href="https://www.google.com/search?q=Nutricionista+Regiane+Silva+Aruj%C3%A1&kgmid=/g/11scftj8g7" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Ver todas as avaliações no Google &nbsp;→</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ SOBRE ══════════════════════════════ -->
+<section id="sobre" data-step="9">
+  <div class="container">
+    <div class="sec-divider"><span class="num">09 / 09</span><div class="line"></div></div>
+    <div class="about-wrap">
+      <div class="photo-frame reveal">
+        <div class="photo-frame-glow"></div>
+        <div class="photo-border">
+          <img src="assets/img/regiane-retrato.jpg" alt="Regiane Silva, nutricionista clínica funcional" />
+        </div>
+        <div class="photo-coord">Nutricionista clínica funcional</div>
+      </div>
+      <div class="about-content">
+        <div class="sec-tag reveal">Sobre mim</div>
+        <h2 class="h2 reveal" style="margin-bottom:20px;">Eu investigo antes de restringir.</h2>
+        <p class="lead reveal">Meu trabalho começa onde a maioria termina: na investigação. Antes de montar qualquer plano alimentar, procuro entender por que seu organismo entrou em desequilíbrio. Porque acredito que tratar apenas sintomas pode aliviar o problema por um tempo, mas descobrir a causa é o que realmente permite recuperar sua saúde.</p>
+        <p class="lead reveal" style="margin-top:18px;">Tenho um perfil racional, investigativo e personalizado — trago autoridade sem recorrer ao medo ou ao terrorismo alimentar. Meu diferencial não está apenas na nutrição funcional, mas na forma como conecto sintomas, metabolismo, intestino, rotina e exames até encontrar a verdadeira causa.</p>
+        <div style="margin-top:36px;" class="reveal">
+          <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Vim%20pelo%20site%20e%20quero%20agendar%20uma%20conversa." target="_blank" rel="noopener" class="btn btn-outline">Agendar uma conversa comigo &nbsp;→</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillars-grid" style="margin-top:80px;">
+      <div class="pillar-chip reveal d1"><span class="pn">01</span>Sintomas têm causa</div>
+      <div class="pillar-chip reveal d2"><span class="pn">02</span>Saúde intestinal</div>
+      <div class="pillar-chip reveal d3"><span class="pn">03</span>Metabolismo</div>
+      <div class="pillar-chip reveal d4"><span class="pn">04</span>Prevenção</div>
+      <div class="pillar-chip reveal d5"><span class="pn">05</span>Longevidade</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ ONDE ESTOU ══════════════════════════════ -->
+<section id="local">
+  <div class="container">
+    <div class="sec-tag reveal">Atendimento Presencial</div>
+    <h2 class="h2 reveal" style="max-width:520px;margin-bottom:0;">Onde você me encontra</h2>
+
+    <div class="local-grid">
+      <div class="reveal d1">
+        <p class="local-address">
+          <strong>Rua Major Benjamin Franco, 739 — Sala 01</strong><br>
+          Centro, Arujá - SP<br>
+          CEP 07400-590
+        </p>
+        <div class="local-actions">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=Rua+Major+Benjamin+Franco%2C+739+-+Sala+01+-+Centro%2C+Aruj%C3%A1+-+SP%2C+07400-590" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Como chegar &nbsp;→</a>
+          <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Vim%20pelo%20site%20e%20quero%20agendar%20uma%20consulta%20presencial." target="_blank" rel="noopener" class="btn btn-primary btn-sm">Falar no WhatsApp &nbsp;→</a>
+        </div>
+      </div>
+      <div class="map-frame-wrap reveal d2">
+        <iframe class="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+          src="https://www.google.com/maps?q=Rua+Major+Benjamin+Franco,+739+-+Sala+01+-+Centro,+Aruj%C3%A1+-+SP,+07400-590&output=embed"
+          title="Localização do consultório de Regiane Silva"></iframe>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ FINAL CTA ══════════════════════════════ -->
+<section id="cta">
+  <div class="container">
+    <div class="cta-wrap reveal">
+      <div class="cta-outer">
+        <div class="cta-inner">
+          <p class="eyebrow">Primeiro passo</p>
+          <h2 class="h2" style="max-width:600px;margin:18px auto 8px;">Seu corpo está tentando dizer alguma coisa.</h2>
+          <p class="lead" style="max-width:480px;margin:0 auto;">A pergunta é: você vai continuar tratando apenas os sintomas ou finalmente descobrir a causa?</p>
+          <div class="cta-steps">
+            <div class="cta-step reveal d1"><div class="cta-step-n">1</div>Faça o Check-up</div>
+            <div class="cta-step reveal d2"><div class="cta-step-n">2</div>Descubra a causa</div>
+            <div class="cta-step reveal d3"><div class="cta-step-n">3</div>Recupere o equilíbrio</div>
+          </div>
+          <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Vim%20pelo%20site%20e%20quero%20iniciar%20minha%20investiga%C3%A7%C3%A3o." target="_blank" rel="noopener" class="btn btn-primary">Quero iniciar minha investigação &nbsp;→</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── footer ── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="lg-name">Regiane Silva</div>
+      <p>Sou nutricionista clínica funcional em Arujá/SP. Investigo a fundo para que o seu organismo volte a funcionar.</p>
+      <p style="margin-top:12px;">Rua Major Benjamin Franco, 739 — Sala 01, Centro, Arujá - SP<br>
+        <a href="https://wa.me/5511947841133" target="_blank" rel="noopener">(11) 94784-1133</a>
+      </p>
+    </div>
+    <div class="footer-links">
+      <a href="#perspectiva">Perspectiva</a>
+      <a href="#metodo">Método</a>
+      <a href="#produtos">Programas</a>
+      <a href="#sobre">Sobre</a>
+      <a href="#local">Onde estou</a>
+      <a href="membros/index.html">Área de Membros</a>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 Regiane Silva — Nutrição Funcional. Todos os direitos reservados.</div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Início — Área do Programa | Regiane Silva</title>
+<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<canvas id="grain-canvas"></canvas>
+<div class="c-dot" id="cdot"></div>
+<div class="c-ring" id="cring"></div>
+
+<div id="loader">
+  <div class="loader-mark">Regiane Silva</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<div class="mem-shell">
+  <aside class="mem-side">
+    <div>
+      <div class="lg-name">Regiane Silva</div>
+      <span class="lg-sub">Área do Programa</span>
+    </div>
+    <ul class="mem-nav">
+      <li><a href="dashboard.html" class="active" onclick="showTab('inicio');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
+        Início
+      </a></li>
+      <li><a href="#aulas" onclick="showTab('aulas');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+        Aulas &amp; Vídeos
+      </a></li>
+      <li><a href="#pontos" onclick="showTab('pontos');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>
+        Meus Pontos
+      </a></li>
+      <li><a href="#rotulo" onclick="showTab('rotulo');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        Raio-X do Rótulo
+      </a></li>
+      <li><a href="#comunidade" onclick="showTab('comunidade');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15 14.2c2.8.4 5 2.4 5 5.8"/></svg>
+        Comunidade
+      </a></li>
+      <li><a href="#materiais" onclick="showTab('materiais');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5"/></svg>
+        Receitas &amp; Materiais
+      </a></li>
+      <li><a href="#plano" onclick="showTab('plano');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6v4H9z"/><path d="M6 7h12v14H6z"/><path d="M9 13h6M9 17h6"/></svg>
+        Meu Plano
+      </a></li>
+      <li><a href="#calendario" onclick="showTab('calendario');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Calendário
+      </a></li>
+    </ul>
+    <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
+    <div class="mem-user">
+      <div class="mem-avatar"></div>
+      <div>
+        <div class="mem-user-name" id="mem-user-name">Paciente</div>
+        <div class="mem-user-role">Programa 90 dias</div>
+      </div>
+      <a href="#" class="mem-logout" id="logout">Sair</a>
+    </div>
+  </aside>
+
+  <main class="mem-main">
+
+    <!-- INÍCIO TAB -->
+    <div id="tab-inicio">
+      <h1 class="mem-hello" id="hello-title">Olá, seja bem-vinda 🌿</h1>
+      <p class="mem-sub">Aqui está o resumo da sua jornada no <strong>Programa Reequilíbrio Funcional</strong>.</p>
+
+      <div class="mem-stats">
+        <div class="mem-stat reveal in">
+          <div class="num" id="stat-dias">42</div>
+          <div class="lbl">Dias de acompanhamento</div>
+        </div>
+        <div class="mem-stat reveal in d1">
+          <div class="num" id="stat-retornos">3</div>
+          <div class="lbl">Retornos realizados</div>
+        </div>
+        <div class="mem-stat reveal in d2">
+          <div class="num" id="stat-receitas">12</div>
+          <div class="lbl">Receitas salvas</div>
+        </div>
+        <div class="mem-stat reveal in d3">
+          <div class="num" id="stat-progresso">78%</div>
+          <div class="lbl">Progresso do programa</div>
+        </div>
+      </div>
+
+      <div class="mem-grid">
+        <div class="mem-panel reveal in">
+          <h3>Próximos passos</h3>
+          <div class="mem-list-item">
+            <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+            <div>
+              <div class="mli-title">Retorno de acompanhamento</div>
+              <div class="mli-sub" id="proximo-retorno-sub">28 de julho · 15h00 · Online</div>
+            </div>
+            <div class="mli-tag">Agendado</div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
+            <div>
+              <div class="mli-title">Nova aula liberada: Intestino e imunidade</div>
+              <div class="mli-sub">Assista na aba Aulas &amp; Vídeos</div>
+            </div>
+            <div class="mli-tag">Novo</div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg></div>
+            <div>
+              <div class="mli-title">Desafio de 7 dias — Intestino em dia</div>
+              <div class="mli-sub">Comece quando quiser, no seu ritmo</div>
+            </div>
+            <div class="mli-tag">Novo</div>
+          </div>
+
+          <h3 style="margin-top:34px;">Progresso do programa</h3>
+          <p style="font-size:13.5px;color:var(--ink-soft);">90 dias de reequilíbrio funcional</p>
+          <div class="mem-progress-bar"><div class="mem-progress-fill" id="progresso-bar" style="width:78%;"></div></div>
+        </div>
+
+        <div class="mem-panel reveal in d1">
+          <h3>Comunidade — atividade recente</h3>
+          <div class="mem-list-item" style="border:none;padding:10px 0;">
+            <div class="mem-avatar" style="width:34px;height:34px;"></div>
+            <div>
+              <div class="mli-title">Marta comentou na Live de julho</div>
+              <div class="mli-sub">há 2 horas</div>
+            </div>
+          </div>
+          <div class="mem-list-item" style="border:none;padding:10px 0;">
+            <div class="mem-avatar" style="width:34px;height:34px;"></div>
+            <div>
+              <div class="mli-title">Nova receita: bowl anti-inflamatório</div>
+              <div class="mli-sub">há 1 dia</div>
+            </div>
+          </div>
+          <div class="mem-list-item" style="border:none;padding:10px 0;">
+            <div class="mem-avatar" style="width:34px;height:34px;"></div>
+            <div>
+              <div class="mli-title">Live mensal: Intestino &amp; imunidade</div>
+              <div class="mli-sub">Sexta, 20h</div>
+            </div>
+          </div>
+          <a href="#comunidade" onclick="showTab('comunidade');return false;" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:10px;">Ver comunidade &nbsp;→</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- AULAS TAB -->
+    <div id="tab-aulas" style="display:none;">
+      <h1 class="mem-hello">Aulas &amp; Vídeos</h1>
+      <p class="mem-sub">Conteúdos que eu gravo especialmente para quem está no acompanhamento.</p>
+
+      <div class="video-toolbar">
+        <button class="video-filter active">Todos</button>
+        <button class="video-filter">Intestino</button>
+        <button class="video-filter">Metabolismo</button>
+        <button class="video-filter">Receitas em vídeo</button>
+        <button class="video-filter">Lives gravadas</button>
+      </div>
+
+      <div class="video-grid">
+        <div class="video-card">
+          <div class="video-thumb">
+            <span class="video-new">Novo</span>
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">14:32</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Intestino</div>
+            <div class="video-title">Por que o intestino comanda tanta coisa no seu corpo</div>
+          </div>
+        </div>
+        <div class="video-card">
+          <div class="video-thumb">
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">09:47</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Metabolismo</div>
+            <div class="video-title">Como interpretar os sinais do seu metabolismo</div>
+          </div>
+        </div>
+        <div class="video-card">
+          <div class="video-thumb">
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">06:12</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Receita em vídeo</div>
+            <div class="video-title">Bowl anti-inflamatório passo a passo</div>
+          </div>
+        </div>
+        <div class="video-card">
+          <div class="video-thumb">
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">38:05</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Live gravada</div>
+            <div class="video-title">Live de julho — perguntas e respostas</div>
+          </div>
+        </div>
+        <div class="video-card">
+          <div class="video-thumb">
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">11:20</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Intestino</div>
+            <div class="video-title">Os 3 hábitos que mais prendem o intestino</div>
+          </div>
+        </div>
+        <div class="video-card">
+          <div class="video-thumb">
+            <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">07:58</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Receita em vídeo</div>
+            <div class="video-title">Café da manhã que não pica o açúcar no sangue</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-hint">✦ Aqui eu publico conteúdos pra vocês. Em breve, teremos novos conteúdos.</div>
+    </div>
+
+    <!-- PONTOS TAB -->
+    <div id="tab-pontos" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Meus Pontos</h1>
+      <p class="mem-sub">Cada foto de resultado que você me envia vira ponto — e ponto vira crédito para os seus próximos passos comigo.</p>
+
+      <div class="mem-stats">
+        <div class="mem-stat reveal in">
+          <div class="num" id="pontos-total">340</div>
+          <div class="lbl">Pontos acumulados</div>
+        </div>
+        <div class="mem-stat reveal in d1">
+          <div class="num" id="pontos-comentarios">7</div>
+          <div class="lbl">Comentários e envios na comunidade</div>
+        </div>
+        <div class="mem-stat reveal in d2">
+          <div class="num" id="pontos-credito">R$ 34</div>
+          <div class="lbl">Crédito disponível</div>
+        </div>
+      </div>
+
+      <div class="mem-grid">
+        <div class="mem-panel reveal in">
+          <h3>Como ganhar pontos</h3>
+          <div class="mem-list-item">
+            <div class="mli-icon">📷</div>
+            <div><div class="mli-title">Foto de resultado (antes/depois do seu corpo)</div><div class="mli-sub">+5 pontos por envio</div></div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">🍽️</div>
+            <div><div class="mli-title">Compartilhar uma foto do seu prato na comunidade</div><div class="mli-sub">+5 pontos por envio</div></div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">💬</div>
+            <div><div class="mli-title">Comentar na comunidade</div><div class="mli-sub">+3 pontos por comentário</div></div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">🤝</div>
+            <div><div class="mli-title">Ajudar ou responder outra paciente</div><div class="mli-sub">+3 pontos por interação</div></div>
+          </div>
+          <p style="font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.6;">✦ Vale foto do seu corpo, do seu prato ou interação real na comunidade — não conta upload de qualquer imagem. A cada <strong>100 pontos</strong>, você ganha <strong>R$10</strong> de crédito, automaticamente.</p>
+          <button type="button" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-top:20px;" onclick="alert('O envio de fotos direto por aqui ainda está em desenvolvimento. Por enquanto, envie sua foto pelo WhatsApp da Regiane.')">Enviar nova foto de resultado &nbsp;→</button>
+        </div>
+        <div class="mem-panel reveal in d1">
+          <h3>Meta do próximo crédito</h3>
+          <p class="card-text">Faltam <strong id="pontos-faltam">60 pontos</strong> para o seu próximo crédito de R$10.</p>
+          <div class="mem-progress-bar" style="margin-top:14px;"><div class="mem-progress-fill" id="pontos-bar" style="width:85%;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RAIO-X DO RÓTULO TAB -->
+    <div id="tab-rotulo" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Raio-X do Rótulo</h1>
+      <p class="mem-sub">Eu te ensino a ler a informação nutricional dos alimentos, pra você nunca mais comprar no escuro.</p>
+      <div class="identify-grid">
+        <div class="glass-card"><span class="card-num">01</span><div class="card-title">Tabela nutricional na prática</div><p class="card-text">O que realmente importa olhar antes de colocar no carrinho.</p></div>
+        <div class="glass-card"><span class="card-num">02</span><div class="card-title">Açúcares escondidos</div><p class="card-text">Os nomes que o açúcar usa pra se disfarçar no rótulo.</p></div>
+        <div class="glass-card"><span class="card-num">03</span><div class="card-title">Vale a pena ou não?</div><p class="card-text">Análises de produtos que eu encontro no mercado, direto pra você.</p></div>
+      </div>
+      <div class="upload-hint">✦ Toda vez que eu analiso um rótulo no mercado, publico aqui pra vocês.</div>
+    </div>
+
+    <!-- COMUNIDADE TAB -->
+    <div id="tab-comunidade" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Comunidade do Programa</h1>
+      <p class="mem-sub">Converse, compartilhe conquistas e participe dos retornos em grupo comigo.</p>
+      <div class="mem-community">
+        <div class="comm-card">
+          <div class="comm-avatars"><span></span><span></span><span></span></div>
+          <div class="h3" style="font-size:16px;">Diário de conquistas</div>
+          <p class="card-text" style="margin-top:8px;">Compartilhe seus resultados e celebre com o grupo.</p>
+        </div>
+        <div class="comm-card">
+          <div class="comm-avatars"><span></span><span></span></div>
+          <div class="h3" style="font-size:16px;">Live mensal</div>
+          <p class="card-text" style="margin-top:8px;">Intestino &amp; imunidade — sexta-feira às 20h.</p>
+        </div>
+        <div class="comm-card">
+          <div class="comm-avatars"><span></span><span></span><span></span></div>
+          <div class="h3" style="font-size:16px;">Desafio do mês</div>
+          <p class="card-text" style="margin-top:8px;">7 dias para reorganizar sua rotina alimentar.</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top:40px;margin-bottom:16px;">Mural de conquistas</h3>
+
+      <div class="feed-post">
+        <div class="feed-head">
+          <div class="mem-avatar" style="width:34px;height:34px;"></div>
+          <div><div class="feed-name">Marta</div><div class="feed-time">há 2 horas</div></div>
+        </div>
+        <p class="feed-text">Semana 6 e finalmente meu intestino funcionando todo dia! 🌿</p>
+        <div class="feed-photo"></div>
+        <div class="feed-comments" id="feed-comments-1">
+          <div class="feed-comment"><div class="fc-avatar"></div><div><span class="fc-name">Regiane</span><span class="fc-text">Que orgulho, Marta! Continue assim 💗</span></div></div>
+        </div>
+        <div class="feed-input-row">
+          <input type="text" placeholder="Escreva um comentário..." id="feed-input-1" />
+          <button type="button" onclick="postComment(1)">Enviar</button>
+        </div>
+      </div>
+
+      <div class="feed-post">
+        <div class="feed-head">
+          <div class="mem-avatar" style="width:34px;height:34px;"></div>
+          <div><div class="feed-name">Juliana</div><div class="feed-time">há 1 dia</div></div>
+        </div>
+        <p class="feed-text">Bowl anti-inflamatório da receita que vocês compartilharam essa semana — ficou incrível!</p>
+        <div class="feed-photo"></div>
+        <div class="feed-comments" id="feed-comments-2"></div>
+        <div class="feed-input-row">
+          <input type="text" placeholder="Escreva um comentário..." id="feed-input-2" />
+          <button type="button" onclick="postComment(2)">Enviar</button>
+        </div>
+      </div>
+
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;">✦ Protótipo de visualização — os comentários daqui ainda não são salvos permanentemente.</p>
+    </div>
+
+    <!-- MATERIAIS TAB -->
+    <div id="tab-materiais" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Receitas &amp; Materiais</h1>
+      <p class="mem-sub">Receituário funcional, planners e guias que preparei para você.</p>
+      <div class="identify-grid">
+        <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Planner alimentar semanal</div><p class="card-text">Organize suas refeições com praticidade.</p></div>
+        <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Guia de organização alimentar</div><p class="card-text">Passo a passo para simplificar o dia a dia.</p></div>
+        <div class="glass-card"><span class="card-num">Receitas</span><div class="card-title">Receituário funcional</div><p class="card-text">Receitas anti-inflamatórias e de fácil preparo.</p></div>
+      </div>
+
+      <h3 id="materiais-pessoais-title" style="margin-top:40px;margin-bottom:16px;display:none;">Materiais indicados pra você</h3>
+      <div class="identify-grid" id="materiais-pessoais"></div>
+    </div>
+
+    <!-- PLANO TAB -->
+    <div id="tab-plano" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Meu Plano</h1>
+      <p class="mem-sub">Seu plano alimentar personalizado, atualizado conforme sua evolução.</p>
+      <div class="mem-panel">
+        <p class="card-text" id="plano-texto">Vou liberar seu plano atualizado logo após o seu próximo retorno em <strong>28 de julho</strong>. Enquanto isso, siga as orientações da última consulta.</p>
+      </div>
+    </div>
+
+    <!-- CALENDARIO TAB -->
+    <div id="tab-calendario" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Calendário</h1>
+      <p class="mem-sub">Seus próximos retornos e eventos da comunidade.</p>
+      <div class="mem-panel">
+        <div class="mem-list-item"><div class="mli-icon">📅</div><div><div class="mli-title">Retorno de acompanhamento</div><div class="mli-sub" id="calendario-retorno-sub">28 de julho · 15h00</div></div></div>
+        <div class="mem-list-item"><div class="mli-icon">🎥</div><div><div class="mli-title">Live mensal</div><div class="mli-sub">Sexta · 20h00</div></div></div>
+      </div>
+
+      <h3 style="margin-top:34px;margin-bottom:16px;">Agendar novo retorno</h3>
+      <div class="mem-panel" id="calendario-slots">
+        <p class="card-text" style="color:var(--muted);">Carregando horários disponíveis...</p>
+      </div>
+      <div id="indique-amigo" class="mem-panel reveal in" style="margin-top:22px;">
+        <h3>Indique uma amiga</h3>
+        <p class="card-text">Compartilhe seu link e ganhe <strong>50 pontos</strong> quando ela fechar uma consulta com a Regiane.</p>
+        <a href="https://wa.me/5511947841133?text=Ol%C3%A1%21%20Quero%20indicar%20uma%20amiga%20pra%20Regiane." target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-top:14px;">Indicar uma amiga &nbsp;→</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/js/api.js"></script>
+<script src="../../assets/js/main.js"></script>
+<script>
+  const patientEmail = sessionStorage.getItem('rs_programa_email');
+  (function(){
+    const nome = sessionStorage.getItem('rs_programa_nome');
+    if(nome) document.getElementById('mem-user-name').textContent = nome;
+    else if(patientEmail) document.getElementById('mem-user-name').textContent = patientEmail.split('@')[0];
+  })();
+  document.getElementById('logout').addEventListener('click', function(e){
+    e.preventDefault();
+    sessionStorage.removeItem('rs_programa_email');
+    sessionStorage.removeItem('rs_programa_nome');
+    window.location.href = 'login.html';
+  });
+  function showTab(name){
+    document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+    document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
+    const tab = document.getElementById('tab-'+name);
+    if(tab){ tab.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
+    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    if(window.__rebindCursor) window.__rebindCursor();
+    if(name==='comunidade') loadComments();
+    if(name==='calendario') loadSlots();
+  }
+  document.querySelectorAll('.video-filter').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.video-filter').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  /* ── DASHBOARD: dados reais da paciente ── */
+  async function loadDashboardData(){
+    if(!apiConfigured() || !patientEmail) return;
+    const d = await apiGet('dashboard', { email: patientEmail });
+    if(!d.ok) return;
+
+    if(d.nome) document.getElementById('hello-title').textContent = 'Olá, ' + d.nome.split(' ')[0] + ' 🌿';
+    document.getElementById('stat-dias').textContent = d.diasAcompanhamento;
+    document.getElementById('stat-retornos').textContent = d.retornosRealizados;
+    document.getElementById('stat-receitas').textContent = d.receitasSalvas;
+    document.getElementById('stat-progresso').textContent = d.progressoPercent + '%';
+    document.getElementById('progresso-bar').style.width = d.progressoPercent + '%';
+
+    if(d.proximoRetornoData){
+      const sub = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '') + ' · Online';
+      document.getElementById('proximo-retorno-sub').textContent = sub;
+      document.getElementById('calendario-retorno-sub').textContent = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '');
+    }
+
+    document.getElementById('pontos-total').textContent = d.pontosTotal;
+    document.getElementById('pontos-comentarios').textContent = d.totalInteracoes;
+    document.getElementById('pontos-credito').textContent = 'R$ ' + d.creditoDisponivel;
+    document.getElementById('pontos-faltam').textContent = d.faltamParaProximoCredito + ' pontos';
+    document.getElementById('pontos-bar').style.width = (100 - d.faltamParaProximoCredito) + '%';
+
+    if(d.planoTexto) document.getElementById('plano-texto').textContent = d.planoTexto;
+
+    if(d.materiais && d.materiais.length){
+      const wrap = document.getElementById('materiais-pessoais');
+      document.getElementById('materiais-pessoais-title').style.display = 'block';
+      d.materiais.forEach(m=>{
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `<span class="card-num"></span><div class="card-title"></div><p class="card-text"></p>`;
+        card.querySelector('.card-num').textContent = m.tipo || 'Material';
+        card.querySelector('.card-title').textContent = m.titulo || '';
+        card.querySelector('.card-text').textContent = m.descricao || '';
+        if(m.link){
+          card.style.cursor = 'none';
+          card.addEventListener('click', ()=>window.open(m.link, '_blank'));
+        }
+        wrap.appendChild(card);
+      });
+      if(window.__rebindCursor) window.__rebindCursor();
+    }
+  }
+  loadDashboardData();
+
+  /* ── COMUNIDADE: comentários reais via API (com fallback local de demonstração) ── */
+  async function loadComments(){
+    if(!apiConfigured()) return;
+    for(const id of [1,2]){
+      const res = await apiGet('comments', { postId: id });
+      if(!res.ok) continue;
+      const wrap = document.getElementById('feed-comments-'+id);
+      res.comments.forEach(c=>{
+        const el = document.createElement('div');
+        el.className = 'feed-comment';
+        el.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
+        el.querySelector('.fc-name').textContent = c.nome;
+        el.querySelector('.fc-text').textContent = c.texto;
+        wrap.appendChild(el);
+      });
+    }
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  async function postComment(id){
+    const input = document.getElementById('feed-input-'+id);
+    const text = input.value.trim();
+    if(!text) return;
+    const wrap = document.getElementById('feed-comments-'+id);
+
+    if(apiConfigured() && patientEmail){
+      const res = await apiPost('comment', { email: patientEmail, postId: id, texto: text });
+      if(!res.ok){ alert(res.error || 'Não foi possível enviar o comentário.'); return; }
+      const c = document.createElement('div');
+      c.className = 'feed-comment';
+      c.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
+      c.querySelector('.fc-name').textContent = res.nome || 'Você';
+      c.querySelector('.fc-text').textContent = text;
+      wrap.appendChild(c);
+      input.value = '';
+      if(window.__rebindCursor) window.__rebindCursor();
+      return;
+    }
+
+    // Modo demonstração (sem backend publicado ainda): não é salvo de verdade.
+    const c = document.createElement('div');
+    c.className = 'feed-comment';
+    c.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name">Você</span><span class="fc-text"></span></div>`;
+    c.querySelector('.fc-text').textContent = text;
+    wrap.appendChild(c);
+    input.value = '';
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  /* ── CALENDÁRIO: horários reais via API ── */
+  async function loadSlots(){
+    const wrap = document.getElementById('calendario-slots');
+    if(!apiConfigured()){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Agenda em breve disponível aqui — por enquanto, fale com a Regiane pelo WhatsApp.</p>';
+      return;
+    }
+    const res = await apiGet('slots');
+    if(!res.ok || !res.slots.length){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhum horário disponível no momento. Fale com a Regiane pelo WhatsApp.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    res.slots.forEach(s=>{
+      const item = document.createElement('div');
+      item.className = 'mem-list-item';
+      item.innerHTML = `<div class="mli-icon">📅</div><div><div class="mli-title"></div></div><button type="button" class="btn btn-outline btn-sm mli-book-btn">Solicitar &nbsp;→</button>`;
+      item.querySelector('.mli-title').textContent = s.data + ' · ' + s.hora;
+      item.querySelector('.mli-book-btn').addEventListener('click', ()=>bookSlot(s.data, s.hora));
+      wrap.appendChild(item);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  async function bookSlot(data, hora){
+    if(!patientEmail){ alert('Faça login novamente para agendar.'); return; }
+    const res = await apiPost('bookSlot', { email: patientEmail, data: data, hora: hora });
+    if(res.ok){
+      alert('Horário solicitado! A Regiane vai confirmar em breve.');
+      loadSlots();
+    } else {
+      alert(res.error || 'Não foi possível solicitar esse horário.');
+    }
+  }
+</script>
+</body>
+</html>

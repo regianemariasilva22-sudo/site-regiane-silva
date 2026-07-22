@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vídeos — Área do Check-up | Regiane Silva</title>
+<link rel="stylesheet" href="../../assets/css/style.css" />
+<style>
+  .mat-detail{ animation:matFadeIn .5s ease; }
+  @keyframes matFadeIn{ from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:none;} }
+  .mat-back{ background:none; border:none; color:var(--marsala); font-weight:700; font-size:13px; cursor:none; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px; padding:0; }
+  .mat-back:hover{ text-decoration:underline; }
+  .mat-card{ cursor:none; text-align:left; width:100%; font-family:inherit; }
+  button.mat-card{ appearance:none; -webkit-appearance:none; }
+
+  .check-item{ display:flex; align-items:center; gap:14px; padding:15px 18px; border-radius:14px; border:1px solid var(--hairline); background:var(--surface); margin-bottom:10px; transition:all .25s; cursor:none; }
+  .check-item:hover{ border-color:rgba(122,42,59,.25); background:var(--surface-tint); }
+  .check-item.checked{ border-color:rgba(122,42,59,.3); background:var(--rose-mist); }
+  .check-item input{ width:20px; height:20px; accent-color:var(--marsala); cursor:none; flex-shrink:0; }
+  .check-item span{ font-size:14.5px; color:var(--ink-soft); }
+  .check-result{ margin-top:24px; padding:22px 24px; border-radius:16px; background:var(--rose-mist); font-size:14.5px; color:var(--marsala-deep); font-weight:600; line-height:1.6; }
+
+  .quiz-q{ margin-bottom:26px; }
+  .quiz-q h4{ font-size:15px; margin-bottom:12px; color:var(--marsala-deep); font-weight:700; }
+  .quiz-opt{ display:flex; align-items:center; gap:10px; padding:11px 18px; border-radius:100px; border:1px solid var(--hairline); margin-bottom:8px; cursor:none; transition:all .2s; background:var(--surface); }
+  .quiz-opt:hover{ border-color:rgba(122,42,59,.25); background:var(--surface-tint); }
+  .quiz-opt input{ accent-color:var(--marsala); cursor:none; }
+  .quiz-opt span{ font-size:14px; color:var(--ink-soft); }
+  #quiz-result{ display:none; }
+
+  .ebook-shell{ position:relative; min-height:440px; border-radius:20px; overflow:hidden; border:1px solid var(--hairline); background:var(--surface); box-shadow:0 20px 50px rgba(122,42,59,.08); }
+  .ebook-page{ display:none; padding:48px 44px; }
+  .ebook-page.active{ display:block; animation:matFadeIn .5s ease; }
+  .ebook-cover{ background:linear-gradient(165deg,var(--marsala) 0%,var(--marsala-deep) 100%); background-image:radial-gradient(circle at 50% -10%,rgba(255,255,255,.1) 0%,transparent 55%),linear-gradient(165deg,var(--marsala) 0%,var(--marsala-deep) 100%); color:#fff; text-align:center; display:flex !important; flex-direction:column; align-items:center; justify-content:center; min-height:440px; padding:60px 40px; }
+  .ebook-page.ebook-cover .eyebrow{ color:rgba(255,255,255,.75); }
+  .ebook-page.ebook-cover h2{ color:#fff; font-size:clamp(22px,3vw,30px); margin:18px 0 12px; font-weight:700; max-width:480px; }
+  .ebook-page.ebook-cover p{ color:rgba(255,255,255,.82) !important; max-width:420px; font-size:14.5px; line-height:1.7; }
+  .ebook-page.ebook-cover .btn{ margin-top:30px; }
+  .ebook-num{ width:48px; height:48px; border-radius:50%; background:var(--rose-mist); color:var(--marsala); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; margin-bottom:22px; font-family:var(--sans); }
+  .ebook-page h3{ font-size:22px; color:var(--marsala-deep); margin-bottom:16px; font-weight:700; }
+  .ebook-page p{ font-size:15px; line-height:1.8; color:var(--ink-soft); margin-bottom:14px; max-width:560px; }
+  .ebook-tip{ margin-top:10px; padding:16px 20px; border-radius:12px; background:var(--rose-mist); font-size:13.5px; color:var(--marsala-deep); font-weight:600; max-width:560px; }
+  .ebook-nav{ display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-top:1px solid var(--hairline-soft); background:var(--surface-tint); border-radius:0 0 20px 20px; }
+  .ebook-nav button{ background:none; border:none; font-weight:700; font-size:13px; color:var(--marsala); cursor:none; padding:8px; }
+  .ebook-nav button:disabled{ opacity:.3; }
+  .ebook-nav span{ font-size:12px; color:var(--muted); font-weight:600; }
+</style>
+</head>
+<body>
+
+<canvas id="grain-canvas"></canvas>
+<div class="c-dot" id="cdot"></div>
+<div class="c-ring" id="cring"></div>
+
+<div id="loader">
+  <div class="loader-mark">Regiane Silva</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<div class="mem-shell">
+  <aside class="mem-side">
+    <div>
+      <div class="lg-name">Regiane Silva</div>
+      <span class="lg-sub">Área do Check-up</span>
+    </div>
+    <ul class="mem-nav">
+      <li><a href="#video" class="active" onclick="showTab('video');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+        Vídeos
+      </a></li>
+      <li><a href="#inicio" onclick="showTab('inicio');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
+        Meu Resultado
+      </a></li>
+      <li><a href="#materiais" onclick="showTab('materiais');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5"/></svg>
+        Materiais
+      </a></li>
+      <li><a href="#proximo" onclick="showTab('proximo');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Próximo Passo
+      </a></li>
+    </ul>
+    <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
+    <div class="mem-user">
+      <div class="mem-avatar"></div>
+      <div>
+        <div class="mem-user-name" id="mem-user-name">Paciente</div>
+        <div class="mem-user-role">Check-up Alimentar</div>
+      </div>
+      <a href="#" class="mem-logout" id="logout">Sair</a>
+    </div>
+  </aside>
+
+  <main class="mem-main">
+
+    <!-- VIDEO -->
+    <div id="tab-video">
+      <h1 class="mem-hello">Vídeos</h1>
+      <p class="mem-sub">Sempre que eu tiver um vídeo novo ou uma atualização pra você, ele aparece aqui — começando por este, de boas-vindas.</p>
+      <div class="video-grid" style="grid-template-columns:1fr;max-width:640px;">
+        <div class="video-card">
+          <div class="video-thumb" style="aspect-ratio:16/10;">
+            <div class="video-play"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="video-duration">03:40</span>
+          </div>
+          <div class="video-body">
+            <div class="video-cat">Regiane explica</div>
+            <div class="video-title">Como entender o resultado do seu Check-up Alimentar Funcional</div>
+          </div>
+        </div>
+      </div>
+      <div class="upload-hint">✦ Sempre que eu tiver uma atualização ou um vídeo novo pra você, ele aparece aqui.</div>
+    </div>
+
+    <!-- INÍCIO / RESULTADO -->
+    <div id="tab-inicio" style="display:none;">
+      <h1 class="mem-hello">Seu Check-up está pronto 🌿</h1>
+      <p class="mem-sub">Eu revisei suas respostas — aqui está o que encontrei e o seu plano inicial de melhorias.</p>
+
+      <div class="mem-grid">
+        <div class="mem-panel reveal in">
+          <h3>Principais fatores identificados</h3>
+          <div class="mem-list-item">
+            <div class="mli-icon">01</div>
+            <div>
+              <div class="mli-title">Rotina alimentar irregular</div>
+              <div class="mli-sub">Horários de refeição inconsistentes ao longo da semana</div>
+            </div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">02</div>
+            <div>
+              <div class="mli-title">Baixa ingestão de fibras</div>
+              <div class="mli-sub">Pode estar relacionada ao intestino preso relatado</div>
+            </div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">03</div>
+            <div>
+              <div class="mli-title">Sinais de oscilação de energia</div>
+              <div class="mli-sub">Possível relação com espaçamento entre refeições</div>
+            </div>
+          </div>
+
+          <h3 style="margin-top:34px;">Meu plano inicial para você</h3>
+          <p class="card-text">Três ajustes simples para começar essa semana, enquanto avaliamos se vale a pena irmos mais fundo juntas:</p>
+          <ul class="belief-list yes" style="margin-top:16px;">
+            <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Fixar 3 horários de refeição por pelo menos 5 dias na semana.</li>
+            <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Incluir uma porção de fibra (fruta ou vegetal) em 2 refeições ao dia.</li>
+            <li><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>Anotar como se sente 1h após cada refeição, por 7 dias.</li>
+          </ul>
+        </div>
+
+        <div class="mem-panel reveal in d1">
+          <h3>Relatório simplificado</h3>
+          <p class="card-text">Este é apenas o começo do que encontrei. Uma investigação completa, com exames e histórico clínico, é que revela a causa real — e é isso que te permite parar de tratar sintoma por sintoma.</p>
+          <a href="#proximo" onclick="showTab('proximo');return false;" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-top:20px;">Ver meu próximo passo &nbsp;→</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATERIAIS -->
+    <div id="tab-materiais" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Materiais</h1>
+      <p class="mem-sub">Alguns conteúdos para você aprofundar enquanto decide os próximos passos.</p>
+
+      <div class="identify-grid" id="materiais-list">
+        <button class="glass-card mat-card reveal in" onclick="openMat('checklist')">
+          <span class="card-num">Checklist</span>
+          <div class="card-title">12 sinais de alerta</div>
+          <p class="card-text">Sinais de que sua alimentação pode estar prejudicando sua saúde.</p>
+        </button>
+        <button class="glass-card mat-card reveal in d1" onclick="openMat('quiz')">
+          <span class="card-num">Quiz</span>
+          <div class="card-title">Qual hábito está te sabotando</div>
+          <p class="card-text">Descubra qual hábito está sabotando seus resultados.</p>
+        </button>
+        <button class="glass-card mat-card reveal in d2" onclick="openMat('ebook')">
+          <span class="card-num">Ebook</span>
+          <div class="card-title">7 erros alimentares</div>
+          <p class="card-text">Os erros mais comuns que atrasam sua evolução.</p>
+        </button>
+      </div>
+
+      <!-- CHECKLIST -->
+      <div class="mat-detail mem-panel" id="mat-checklist" style="display:none;margin-top:8px;">
+        <button class="mat-back" onclick="closeMat('checklist')">← Voltar aos materiais</button>
+        <h3>12 sinais de que sua alimentação pode estar prejudicando sua saúde</h3>
+        <p class="card-text" style="margin-bottom:18px;">Marque os sinais que você reconhece em você hoje:</p>
+        <div id="checklist-items"></div>
+        <div class="mem-progress-bar" style="margin-top:6px;"><div class="mem-progress-fill" id="checklist-bar" style="width:0%;"></div></div>
+        <div class="check-result" id="checklist-result">Marque os sinais acima para ver o que eles podem indicar.</div>
+        <a href="#" id="checklist-cta" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-top:16px;display:none;"></a>
+      </div>
+
+      <!-- QUIZ -->
+      <div class="mat-detail mem-panel" id="mat-quiz" style="display:none;margin-top:8px;">
+        <button class="mat-back" onclick="closeMat('quiz')">← Voltar aos materiais</button>
+        <h3>Qual hábito está sabotando seus resultados?</h3>
+        <p class="card-text" style="margin-bottom:22px;">Responda com sinceridade — isso tem a ver com rotina, comportamento e ambiente, não só com o prato.</p>
+
+        <div id="quiz-questions">
+          <div class="quiz-q">
+            <h4>1. Com que frequência você belisca entre as refeições sem sentir fome de verdade?</h4>
+            <label class="quiz-opt"><input type="radio" name="q1" value="0">  <span>Nunca</span></label>
+            <label class="quiz-opt"><input type="radio" name="q1" value="1">  <span>Às vezes</span></label>
+            <label class="quiz-opt"><input type="radio" name="q1" value="2">  <span>Quase todo dia</span></label>
+            <label class="quiz-opt"><input type="radio" name="q1" value="3">  <span>Todos os dias</span></label>
+          </div>
+          <div class="quiz-q">
+            <h4>2. Quando você assiste a vídeos ou programas de comida (tipo MasterChef), sente mais vontade de comer algo diferente do planejado?</h4>
+            <label class="quiz-opt"><input type="radio" name="q2" value="0">  <span>Nunca</span></label>
+            <label class="quiz-opt"><input type="radio" name="q2" value="1">  <span>Raramente</span></label>
+            <label class="quiz-opt"><input type="radio" name="q2" value="2">  <span>Frequentemente</span></label>
+            <label class="quiz-opt"><input type="radio" name="q2" value="3">  <span>Sempre</span></label>
+          </div>
+          <div class="quiz-q">
+            <h4>3. Você costuma comer nos mesmos horários todos os dias?</h4>
+            <label class="quiz-opt"><input type="radio" name="q3" value="0">  <span>Sim, sempre</span></label>
+            <label class="quiz-opt"><input type="radio" name="q3" value="1">  <span>Na maioria dos dias</span></label>
+            <label class="quiz-opt"><input type="radio" name="q3" value="2">  <span>Poucas vezes</span></label>
+            <label class="quiz-opt"><input type="radio" name="q3" value="3">  <span>Quase nunca</span></label>
+          </div>
+          <div class="quiz-q">
+            <h4>4. Quantos copos de água você bebe, em média, por dia?</h4>
+            <label class="quiz-opt"><input type="radio" name="q4" value="0">  <span>Mais de 8</span></label>
+            <label class="quiz-opt"><input type="radio" name="q4" value="1">  <span>Entre 5 e 8</span></label>
+            <label class="quiz-opt"><input type="radio" name="q4" value="2">  <span>Entre 2 e 4</span></label>
+            <label class="quiz-opt"><input type="radio" name="q4" value="3">  <span>Menos de 2</span></label>
+          </div>
+          <div class="quiz-q">
+            <h4>5. Você usa a comida para lidar com estresse, ansiedade ou tristeza?</h4>
+            <label class="quiz-opt"><input type="radio" name="q5" value="0">  <span>Nunca</span></label>
+            <label class="quiz-opt"><input type="radio" name="q5" value="1">  <span>Raramente</span></label>
+            <label class="quiz-opt"><input type="radio" name="q5" value="2">  <span>Às vezes</span></label>
+            <label class="quiz-opt"><input type="radio" name="q5" value="3">  <span>Frequentemente</span></label>
+          </div>
+          <div class="quiz-q">
+            <h4>6. Quantas horas você dorme, em média, por noite?</h4>
+            <label class="quiz-opt"><input type="radio" name="q6" value="0">  <span>Mais de 7h</span></label>
+            <label class="quiz-opt"><input type="radio" name="q6" value="1">  <span>Entre 6 e 7h</span></label>
+            <label class="quiz-opt"><input type="radio" name="q6" value="2">  <span>Entre 5 e 6h</span></label>
+            <label class="quiz-opt"><input type="radio" name="q6" value="3">  <span>Menos de 5h</span></label>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="calcQuiz()">Ver resultado &nbsp;→</button>
+        </div>
+
+        <div id="quiz-result">
+          <div class="check-result" id="quiz-result-text"></div>
+          <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20quiz%20do%20Check-up%20e%20quero%20entender%20melhor%20meus%20resultados." target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="margin-top:18px;">Falar com a Regiane sobre isso &nbsp;→</a>
+        </div>
+      </div>
+
+      <!-- EBOOK -->
+      <div class="mat-detail" id="mat-ebook" style="display:none;margin-top:8px;">
+        <button class="mat-back" onclick="closeMat('ebook')">← Voltar aos materiais</button>
+        <div class="ebook-shell">
+
+          <div class="ebook-page ebook-cover active">
+            <p class="eyebrow">Um guia da Regiane Silva</p>
+            <h2>7 Erros Alimentares que Atrasam sua Evolução</h2>
+            <p>Por que fazer "tudo certo" às vezes não é o suficiente — e o que investigar antes de mudar mais uma vez o que você come.</p>
+            <button class="btn btn-primary" onclick="ebookGo(1)">Começar a leitura &nbsp;→</button>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">1</div>
+            <h3>Cortar grupos alimentares inteiros sem necessidade</h3>
+            <p>Cortar carboidratos, glúten ou laticínios sem uma real necessidade clínica não resolve a causa do problema — só tira sabor e variedade da sua vida. Meu trabalho começa investigando se aquele grupo alimentar é realmente o vilão, ou se o desequilíbrio está em outro lugar: intestino, metabolismo, rotina.</p>
+            <p>Restringir sem investigar costuma gerar mais compulsão do que resultado, porque o corpo sente falta — e a vontade represada geralmente volta com força, e com culpa.</p>
+            <div class="ebook-tip">Antes de cortar algo, pergunte: eu sei por que estou cortando isso, ou estou só copiando uma regra que ouvi por aí?</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">2</div>
+            <h3>Copiar a dieta de outra pessoa</h3>
+            <p>Não existe dieta universal. Existe o seu organismo — com a sua rotina, seu intestino, seu metabolismo e sua história. O que funcionou pra sua amiga, sua irmã ou aquela pessoa que você viu nas redes pode simplesmente não fazer sentido pro seu corpo.</p>
+            <p>Cada organismo responde de um jeito diferente ao mesmo estímulo. Um plano que ignora isso está fadado a parar de funcionar — geralmente bem rápido.</p>
+            <div class="ebook-tip">Um plano alimentar não é uma receita pronta. É uma investigação sobre você.</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">3</div>
+            <h3>Focar só na balança e ignorar os outros sinais do corpo</h3>
+            <p>O peso é só um número — e nem sempre o mais importante. Energia, sono, digestão, humor e disposição contam a história real do que está acontecendo com você.</p>
+            <p>Sintomas nunca aparecem por acaso: cada um é um sinal que o corpo dá quando algo está fora do equilíbrio. Ignorar esses sinais pra focar só na balança é tratar a consequência e deixar a causa exatamente onde estava.</p>
+            <div class="ebook-tip">Se a balança não se mexeu mas você dorme melhor, está menos inchada e mais disposta — isso também é resultado.</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">4</div>
+            <h3>Pular refeições achando que emagrece mais rápido</h3>
+            <p>Pular refeições parece um atalho, mas costuma desregular ainda mais o metabolismo e aumentar a chance de compulsão nas próximas refeições. O corpo não entende "economia calórica" — ele entende sinais de escassez, e reage se defendendo.</p>
+            <p>Emagrecimento saudável é consequência de um organismo que funciona bem, não de privação.</p>
+            <div class="ebook-tip">Comer nos horários certos costuma destravar mais resultado do que comer de menos.</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">5</div>
+            <h3>Não beber água suficiente</h3>
+            <p>A hidratação afeta digestão, saciedade, energia e até a retenção de líquido. Muita gente troca água por outros líquidos ao longo do dia e sente inchaço, cansaço e fome constante sem entender por quê.</p>
+            <p>É um dos ajustes mais simples — e mais subestimados — que existem.</p>
+            <div class="ebook-tip">Sentir fome pouco depois de comer às vezes é sede disfarçada.</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">6</div>
+            <h3>Ignorar o sono como parte da alimentação</h3>
+            <p>Sono ruim altera diretamente os hormônios da fome e da saciedade, aumentando a vontade de comer açúcar e ultraprocessados no dia seguinte. Cuidar da alimentação sem cuidar do sono é tentar consertar só metade do problema.</p>
+            <div class="ebook-tip">Antes de mudar o cardápio de novo, olhe pra quantas horas você tem dormido.</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">7</div>
+            <h3>Trocar por versões "diet" ou "light" sem entender o rótulo</h3>
+            <p>Nem sempre a versão "diet" ou "light" é a escolha mais saudável — às vezes ela troca açúcar por outros ingredientes que também merecem atenção. Aprender a ler o rótulo de verdade (não só a embalagem) é o que te dá autonomia pra escolher o que realmente serve pra você.</p>
+            <div class="ebook-tip">No Programa Reequilíbrio Funcional eu te ensino isso de perto, no "Raio-X do Rótulo".</div>
+          </div>
+
+          <div class="ebook-page">
+            <div class="ebook-num">✦</div>
+            <h3>Seu corpo não está contra você</h3>
+            <p>Esses 7 erros têm uma coisa em comum: todos tentam resolver o sintoma sem entender a causa. E é exatamente aí que eu entro — investigando a fundo, antes de propor qualquer mudança, pra que o resultado seja consequência de um organismo em equilíbrio, não de mais uma restrição.</p>
+            <p>Se você se reconheceu em algum desses pontos, esse é um bom momento pra conversarmos.</p>
+            <a href="https://wa.me/5511947841133?text=Ol%C3%A1%2C%20Regiane%21%20Li%20o%20ebook%20dos%207%20erros%20alimentares%20e%20quero%20entender%20meu%20caso." target="_blank" rel="noopener" class="btn btn-primary" style="margin-top:8px;">Quero entender meu caso &nbsp;→</a>
+          </div>
+
+        </div>
+        <div class="ebook-nav">
+          <button id="ebook-prev" onclick="ebookGo(ebookIdx-1)" disabled>← Anterior</button>
+          <span id="ebook-counter">1 / 9</span>
+          <button id="ebook-next" onclick="ebookGo(ebookIdx+1)">Próxima &nbsp;→</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRÓXIMO PASSO -->
+    <div id="tab-proximo" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Seu Próximo Passo</h1>
+      <p class="mem-sub">O Check-up é o começo. Para chegar à causa real, eu preciso investigar mais fundo.</p>
+      <div class="cta-wrap" style="margin:0;max-width:100%;">
+        <div class="cta-outer">
+          <div class="cta-inner" style="padding:56px 40px;">
+            <p class="eyebrow">Consulta Funcional Completa</p>
+            <h2 class="h2" style="margin:14px 0;">Vamos investigar a fundo, juntas</h2>
+            <p class="lead" style="max-width:480px;margin:0 auto 28px;">Consulta dupla: história clínica completa, solicitação e avaliação de exames, e um plano alimentar totalmente personalizado para você.</p>
+            <a href="../../index.html#produtos" class="btn btn-primary">Conhecer a Consulta Funcional Completa &nbsp;→</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/js/main.js"></script>
+<script>
+  (function(){
+    const email = sessionStorage.getItem('rs_checkup_email');
+    if(email) document.getElementById('mem-user-name').textContent = email.split('@')[0];
+  })();
+  document.getElementById('logout').addEventListener('click', function(e){
+    e.preventDefault();
+    sessionStorage.removeItem('rs_checkup_email');
+    window.location.href = 'login.html';
+  });
+  function showTab(name){
+    document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+    document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
+    const tab = document.getElementById('tab-'+name);
+    if(tab){ tab.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
+    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  /* ── MATERIAIS: abrir/fechar ── */
+  function openMat(name){
+    document.getElementById('materiais-list').style.display='none';
+    document.getElementById('mat-'+name).style.display='block';
+    if(name==='ebook') ebookGo(0);
+  }
+  function closeMat(name){
+    document.getElementById('mat-'+name).style.display='none';
+    document.getElementById('materiais-list').style.display='grid';
+  }
+
+  /* ── EBOOK ── */
+  let ebookIdx = 0;
+  function ebookGo(i){
+    const pages = document.querySelectorAll('#mat-ebook .ebook-page');
+    if(i<0 || i>=pages.length) return;
+    pages.forEach(p=>p.classList.remove('active'));
+    pages[i].classList.add('active');
+    ebookIdx = i;
+    document.getElementById('ebook-counter').textContent = (i+1)+' / '+pages.length;
+    document.getElementById('ebook-prev').disabled = i===0;
+    document.getElementById('ebook-next').disabled = i===pages.length-1;
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  /* ── CHECKLIST 12 SINAIS ── */
+  const SINAIS = [
+    { t:'Sinto fome poucas horas depois de comer', cat:'metabolismo' },
+    { t:'Tenho inchaço ou desconforto abdominal frequente', cat:'intestino' },
+    { t:'Sinto sono ou cansaço logo após as refeições', cat:'metabolismo' },
+    { t:'Como rápido demais, sem perceber quando estou satisfeita', cat:'comportamento' },
+    { t:'Bebo menos de 1 litro de água por dia', cat:'rotina' },
+    { t:'Tenho compulsão por doces à tarde ou à noite', cat:'comportamento' },
+    { t:'Costumo pular refeições e depois como em excesso', cat:'rotina' },
+    { t:'Meu intestino não funciona todos os dias', cat:'intestino' },
+    { t:'Acordo inchada ou com o rosto inchado', cat:'intestino' },
+    { t:'"Faço tudo certo" mas sinto que não emagreço', cat:'metabolismo' },
+    { t:'Tenho oscilações de humor relacionadas à fome', cat:'comportamento' },
+    { t:'Já tentei várias dietas e sempre volto ao peso anterior', cat:'metabolismo' }
+  ];
+
+  const CATEGORIA_INFO = {
+    intestino: {
+      msg: 'Boa parte do que você marcou tem a ver com o intestino — inchaço, funcionamento irregular, retenção. O intestino influencia praticamente todo o organismo, e esses sinais, quando ignorados, tendem a evoluir para inflamação persistente e mais dificuldade de emagrecer, por mais que você ajuste a dieta sozinha. Isso pede uma investigação com exames pra ir direto à causa.',
+      produto: 'Consulta Funcional Completa',
+      ctaText: 'Quero investigar meu intestino a fundo →',
+      ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20intestino%20e%20quero%20agendar%20a%20Consulta%20Funcional%20Completa.'
+    },
+    metabolismo: {
+      msg: 'O que você marcou aponta bastante pro metabolismo — fome que volta rápido, cansaço após comer, a sensação de "fazer tudo certo" e não ver resultado, ou o efeito sanfona de sempre voltar ao peso anterior. Isso raramente se resolve com um ajuste pontual: sem acompanhamento, tende a se repetir, dieta após dieta.',
+      produto: 'Programa Reequilíbrio Funcional (90 dias)',
+      ctaText: 'Quero conhecer o Programa 90 dias →',
+      ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20metabolismo%20e%20quero%20conhecer%20o%20Programa%20Reequil%C3%ADbrio%20Funcional.'
+    },
+    comportamento: {
+      msg: 'Muito do que você marcou está ligado ao comportamento alimentar — comer rápido demais, compulsão por doce, humor que muda com a fome. Isso geralmente não se resolve só com força de vontade, e se ignorado tende a gerar mais culpa e mais ciclos de compulsão.',
+      produto: 'Consulta Funcional Completa',
+      ctaText: 'Quero entender minha relação com a comida →',
+      ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20comportamento%20alimentar%20e%20quero%20agendar%20a%20Consulta%20Funcional%20Completa.'
+    },
+    rotina: {
+      msg: 'O que você marcou tem a ver principalmente com hábitos de rotina — água, horários das refeições. São sinais mais simples isoladamente, mas que também se acumulam com o tempo se ficarem sem direção certa.',
+      produto: 'Consultoria Estratégica Nutricional',
+      ctaText: 'Quero minha Consultoria Estratégica →',
+      ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pra%20rotina%20e%20quero%20saber%20mais%20sobre%20a%20Consultoria%20Estrat%C3%A9gica.'
+    },
+    misto: {
+      msg: 'Você marcou sinais espalhados em áreas diferentes do organismo — o que também é comum, e geralmente indica que o desequilíbrio está afetando mais de uma frente ao mesmo tempo.',
+      produto: 'Consultoria Estratégica Nutricional',
+      ctaText: 'Quero minha Consultoria Estratégica →',
+      ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20est%C3%A3o%20espalhados%20e%20quero%20saber%20mais%20sobre%20a%20Consultoria%20Estrat%C3%A9gica.'
+    }
+  };
+  const PRIORIDADE = ['intestino','metabolismo','comportamento','rotina'];
+
+  (function(){
+    const wrap = document.getElementById('checklist-items');
+    if(!wrap) return;
+    SINAIS.forEach((s,i)=>{
+      const item = document.createElement('label');
+      item.className = 'check-item';
+      item.innerHTML = `<input type="checkbox" data-idx="${i}" data-cat="${s.cat}"> <span>${s.t}</span>`;
+      wrap.appendChild(item);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
+    wrap.addEventListener('change', ()=>{
+      const total = wrap.querySelectorAll('input').length;
+      const checkedInputs = Array.from(wrap.querySelectorAll('input:checked'));
+      const checked = checkedInputs.length;
+      wrap.querySelectorAll('.check-item').forEach(el=>{
+        el.classList.toggle('checked', el.querySelector('input').checked);
+      });
+      document.getElementById('checklist-bar').style.width = (checked/total*100)+'%';
+      const r = document.getElementById('checklist-result');
+      const cta = document.getElementById('checklist-cta');
+
+      if(checked===0){
+        r.textContent = 'Marque os sinais acima para ver o que eles podem indicar.';
+        cta.style.display = 'none';
+        return;
+      }
+
+      const counts = { intestino:0, metabolismo:0, comportamento:0, rotina:0 };
+      checkedInputs.forEach(inp => counts[inp.dataset.cat]++);
+      const max = Math.max(...Object.values(counts));
+      const top = PRIORIDADE.filter(cat => counts[cat] === max);
+      const categoria = (max === 0 || top.length > 1) ? 'misto' : top[0];
+      const info = CATEGORIA_INFO[categoria];
+
+      r.textContent = `Você marcou ${checked} de ${total} sinais. ${info.msg} O passo indicado agora é: ${info.produto}.`;
+      cta.textContent = info.ctaText;
+      cta.href = 'https://wa.me/5511947841133?text=' + info.ctaMsg;
+      cta.style.display = 'flex';
+    });
+  })();
+
+  /* ── QUIZ ── */
+  function calcQuiz(){
+    const names = ['q1','q2','q3','q4','q5','q6'];
+    let total = 0, answered = 0;
+    names.forEach(n=>{
+      const sel = document.querySelector(`input[name="${n}"]:checked`);
+      if(sel){ total += parseInt(sel.value,10); answered++; }
+    });
+    if(answered < names.length){
+      alert('Responda todas as perguntas para ver o resultado.');
+      return;
+    }
+    document.getElementById('quiz-questions').style.display='none';
+    const result = document.getElementById('quiz-result');
+    result.style.display='block';
+    let msg;
+    if(total<=5){ msg = `Sua pontuação foi ${total} de 18. Seus hábitos de rotina já estão bem alinhados — talvez falte só um ajuste fino para destravar seus resultados.`; }
+    else if(total<=11){ msg = `Sua pontuação foi ${total} de 18. Você tem alguns hábitos de rotina sabotando seus resultados sem perceber — vale a pena entender quais.`; }
+    else { msg = `Sua pontuação foi ${total} de 18. Seus hábitos de rotina estão pesando bastante contra você. Vale muito a pena investigarmos isso juntas.`; }
+    document.getElementById('quiz-result-text').textContent = msg;
+  }
+</script>
+</body>
+</html>
