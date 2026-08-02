@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Entrar — Área do Programa | Regiane Silva</title>
 <link rel="stylesheet" href="../../assets/css/style.css" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -28,25 +29,13 @@
       <span class="lg-sub">Área do Programa</span>
     </div>
     <h1 class="auth-title">Bem-vinda de volta</h1>
-    <p class="auth-sub">Entre para acessar seu acompanhamento, comunidade, aulas e materiais.</p>
+    <p class="auth-sub">Entre com sua conta Google para acessar seu acompanhamento, comunidade, aulas e materiais.</p>
 
-    <div class="auth-error" id="auth-error">E-mail ou senha incorretos. Use a conta de demonstração abaixo.</div>
+    <div class="auth-error" id="auth-error"></div>
 
-    <form id="login-form">
-      <div class="field">
-        <label for="email">E-mail</label>
-        <input type="email" id="email" placeholder="voce@email.com" value="paciente@demo.com" required />
-      </div>
-      <div class="field">
-        <label for="senha">Senha</label>
-        <input type="password" id="senha" placeholder="••••••••" value="demo123" required />
-      </div>
-      <button type="submit" class="btn btn-primary auth-submit">Entrar &nbsp;→</button>
-    </form>
+    <div id="g_signin_btn" style="display:flex;justify-content:center;"></div>
 
-    <div class="auth-demo">✦ Conta de demonstração já preenchida — apenas clique em <strong>Entrar</strong>.</div>
-
-    <p class="auth-foot">Fez apenas o Check-up? <a href="../checkup/login.html">Acesse por aqui</a></p>
+    <p class="auth-foot" style="margin-top:26px;">Fez apenas o Check-up? <a href="../checkup/login.html">Acesse por aqui</a></p>
     <p class="auth-foot" style="margin-top:6px;"><a href="../index.html">← Voltar para a escolha de área</a></p>
   </div>
 </div>
@@ -54,42 +43,44 @@
 <script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
 <script>
-  document.getElementById('login-form').addEventListener('submit', async function(e){
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const senha = document.getElementById('senha').value.trim();
-    const err = document.getElementById('auth-error');
-    const btn = document.querySelector('.auth-submit');
-    err.classList.remove('show');
-
-    if(!email || !senha){
-      err.textContent = 'Preencha e-mail e senha.';
-      err.classList.add('show');
+  window.addEventListener('load', function(){
+    if(typeof google === 'undefined' || !google.accounts){
+      document.getElementById('auth-error').textContent = 'Não foi possível carregar o login do Google. Verifique sua conexão e recarregue a página.';
+      document.getElementById('auth-error').classList.add('show');
       return;
     }
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential
+    });
+    google.accounts.id.renderButton(document.getElementById('g_signin_btn'), {
+      theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', width: 300
+    });
+  });
+
+  async function handleGoogleCredential(response){
+    const err = document.getElementById('auth-error');
+    err.classList.remove('show');
 
     if(!apiConfigured()){
-      // Backend ainda não publicado: modo demonstração, qualquer e-mail/senha entra.
-      sessionStorage.setItem('rs_programa_email', email);
+      // Backend ainda não publicado: modo demonstração — entra com o e-mail do Google, sem checar cadastro.
+      const payload = JSON.parse(atob(response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      sessionStorage.setItem('rs_programa_email', payload.email);
+      sessionStorage.setItem('rs_programa_nome', payload.name || '');
       window.location.href = 'dashboard.html';
       return;
     }
 
-    btn.disabled = true;
-    btn.textContent = 'Entrando...';
-    const result = await apiGet('login', { email: email });
-    btn.disabled = false;
-    btn.innerHTML = 'Entrar &nbsp;→';
-
+    const result = await apiPost('googleLoginPrograma', { idToken: response.credential });
     if(result.ok){
       sessionStorage.setItem('rs_programa_email', result.email);
       sessionStorage.setItem('rs_programa_nome', result.nome || '');
       window.location.href = 'dashboard.html';
     } else {
-      err.textContent = result.error || 'E-mail ou senha incorretos.';
+      err.textContent = result.error || 'Não foi possível entrar com esta conta Google.';
       err.classList.add('show');
     }
-  });
+  }
 </script>
 </body>
 </html>

@@ -6,6 +6,9 @@
 // Depois de publicar o Apps Script como Web App, cole a URL aqui:
 const API_URL = 'COLE_AQUI_A_URL_DO_WEB_APP';
 
+// Client ID do OAuth do Google (Sign In With Google) — já criado no Google Cloud Console
+const GOOGLE_CLIENT_ID = '288771217381-mt5g3dhdjhcoak6kphd1fhsarrkd44bc.apps.googleusercontent.com';
+
 function apiConfigured() {
   return typeof API_URL === 'string' && API_URL.indexOf('COLE_AQUI') === -1;
 }

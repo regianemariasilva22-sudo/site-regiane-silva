@@ -1,11 +1,17 @@
 /**
- * Backend da Área do Programa — Regiane Silva
+ * Backend das Áreas de Membros (Programa + Check-up) — Regiane Silva
  * Lê e escreve numa Google Sheet, publicado como Web App.
  * Veja INSTRUCOES.md para o passo a passo de publicação.
  */
 
 // Cole aqui o ID da planilha (fica na URL dela, entre /d/ e /edit)
 const SHEET_ID = 'COLE_AQUI_O_ID_DA_PLANILHA';
+
+// Client ID do OAuth do Google (Sign In With Google), criado no Google Cloud Console
+const GOOGLE_CLIENT_ID = '288771217381-mt5g3dhdjhcoak6kphd1fhsarrkd44bc.apps.googleusercontent.com';
+
+// E-mail da Regiane, para onde vão os avisos de novo cadastro/acesso liberado
+const REGIANE_NOTIFICATION_EMAIL = 'COLE_AQUI_O_EMAIL_DA_REGIANE';
 
 function getSheet(name) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(name);
@@ -35,6 +41,31 @@ function normEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+/**
+ * Verifica um id_token do Google Sign In (emitido pro nosso GOOGLE_CLIENT_ID)
+ * e retorna o e-mail verificado. Lança erro se o token for inválido.
+ */
+function verifyGoogleToken(idToken) {
+  if (!idToken) throw new Error('Token do Google ausente.');
+  const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), {
+    muteHttpExceptions: true
+  });
+  const info = JSON.parse(res.getContentText());
+  if (info.error) throw new Error('Token do Google inválido: ' + info.error);
+  if (info.aud !== GOOGLE_CLIENT_ID) throw new Error('Token não pertence a este app.');
+  if (info.email_verified !== 'true' && info.email_verified !== true) throw new Error('E-mail do Google não verificado.');
+  return { email: normEmail(info.email), nome: info.name || info.email };
+}
+
+function notifyRegiane(assunto, corpo) {
+  if (!REGIANE_NOTIFICATION_EMAIL || REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') !== -1) return;
+  try {
+    MailApp.sendEmail(REGIANE_NOTIFICATION_EMAIL, assunto, corpo);
+  } catch (err) {
+    // não deixa o fluxo principal quebrar se o e-mail falhar
+  }
+}
+
 // ── ROTEAMENTO ──────────────────────────────────────────
 
 function doGet(e) {
@@ -56,6 +87,10 @@ function doPost(e) {
     const action = body.action;
     if (action === 'comment') return jsonResponse(actionAddComment(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
+    if (action === 'googleLoginPrograma') return jsonResponse(actionGoogleLoginPrograma(body));
+    if (action === 'googleLoginCheckup') return jsonResponse(actionGoogleLoginCheckup(body));
+    if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
+    if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -84,6 +119,20 @@ function actionLogin(email) {
   const p = findPatientRow(email);
   if (!p) {
     return { ok: false, error: 'E-mail não encontrado. Verifique com a Regiane se seu cadastro já foi feito.' };
+  }
+  return { ok: true, nome: p.Nome, email: p.Email };
+}
+
+/**
+ * Login da Área do Programa via "Continuar com o Google".
+ * Verifica o token, confirma que o e-mail está cadastrado na aba Pacientes,
+ * e libera o acesso (sem aceitar e-mail digitado à mão).
+ */
+function actionGoogleLoginPrograma(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const p = findPatientRow(auth.email);
+  if (!p) {
+    return { ok: false, error: 'Não encontramos seu cadastro no Programa com esta conta Google. Fale com a Regiane.' };
   }
   return { ok: true, nome: p.Nome, email: p.Email };
 }
@@ -203,6 +252,117 @@ function actionBookSlot(body) {
       break;
     }
   }
+
+  return { ok: true };
+}
+
+// ── CHECK-UP (acesso único por e-mail, liberado via pagamento) ──────
+
+function findCheckupRow(email) {
+  const sheet = getSheet('CheckupPacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === normEmail(email)) {
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = data[i][idx]);
+      obj._row = i + 1;
+      return obj;
+    }
+  }
+  return null;
+}
+
+/**
+ * Login da Área do Check-up via "Continuar com o Google".
+ * Só entra quem já teve o acesso liberado (por pagamento confirmado no Asaas,
+ * ou cadastro manual da Regiane na planilha).
+ */
+function actionGoogleLoginCheckup(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const c = findCheckupRow(auth.email);
+
+  if (!c) {
+    return { ok: false, error: 'Não encontramos seu Check-up. Se você já pagou, aguarde a liberação — pode levar alguns minutos.' };
+  }
+  if (String(c.Liberado).trim().toLowerCase() !== 'sim') {
+    return { ok: false, error: 'Seu pagamento ainda não foi confirmado. Assim que for, seu acesso libera automaticamente.' };
+  }
+
+  return {
+    ok: true,
+    nome: c.Nome || auth.nome,
+    email: c.Email,
+    jaFezCheckup: String(c.JaFezCheckup).trim().toLowerCase() === 'sim',
+    respostasChecklist: c.RespostasChecklist ? JSON.parse(c.RespostasChecklist) : null,
+    respostasQuiz: c.RespostasQuiz ? JSON.parse(c.RespostasQuiz) : null
+  };
+}
+
+/**
+ * Salva as respostas do quiz/checklist do Check-up — só pode ser feito UMA vez
+ * por e-mail. Depois disso, o login sempre retorna o resultado já salvo.
+ */
+function actionSubmitCheckup(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const c = findCheckupRow(auth.email);
+  if (!c) return { ok: false, error: 'Check-up não encontrado para este e-mail.' };
+  if (String(c.JaFezCheckup).trim().toLowerCase() === 'sim') {
+    return { ok: false, error: 'Este e-mail já respondeu o Check-up. Cada Check-up pode ser feito apenas uma vez.' };
+  }
+
+  const sheet = getSheet('CheckupPacientes');
+  const headers = sheet.getDataRange().getValues()[0];
+  const row = c._row;
+  sheet.getRange(row, headers.indexOf('JaFezCheckup') + 1).setValue('Sim');
+  sheet.getRange(row, headers.indexOf('RespostasChecklist') + 1).setValue(JSON.stringify(body.respostasChecklist || {}));
+  sheet.getRange(row, headers.indexOf('RespostasQuiz') + 1).setValue(JSON.stringify(body.respostasQuiz || {}));
+  sheet.getRange(row, headers.indexOf('DataCheckup') + 1).setValue(new Date());
+
+  return { ok: true };
+}
+
+/**
+ * Recebe o webhook do Asaas quando um pagamento é confirmado, e libera o
+ * acesso ao Check-up automaticamente pro e-mail usado na compra.
+ *
+ * IMPORTANTE: o payload padrão do Asaas traz o ID do cliente (payment.customer),
+ * não o e-mail direto. Pra resolver o e-mail é preciso chamar a API do Asaas
+ * (GET /customers/{id}) com a chave de API — isso ainda depende de vocês me
+ * passarem a chave. Por enquanto, esta função aceita um e-mail já presente
+ * no payload (caso configurem isso no Asaas) OU pode ser adaptada assim que
+ * tivermos a chave de API.
+ */
+function actionAsaasWebhook(body) {
+  const evento = body.event || '';
+  const eventosConfirmados = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'];
+  if (eventosConfirmados.indexOf(evento) === -1) {
+    return { ok: true, ignorado: true };
+  }
+
+  const payment = body.payment || {};
+  const email = normEmail(payment.customerEmail || payment.email || body.email);
+  const nome = payment.customerName || payment.name || '';
+
+  if (!email) {
+    return { ok: false, error: 'Webhook do Asaas sem e-mail do cliente. Configuração da API do Asaas ainda pendente.' };
+  }
+
+  const sheet = getSheet('CheckupPacientes');
+  const existente = findCheckupRow(email);
+
+  if (existente) {
+    const headers = sheet.getDataRange().getValues()[0];
+    sheet.getRange(existente._row, headers.indexOf('Liberado') + 1).setValue('Sim');
+  } else {
+    sheet.appendRow([email, nome, new Date(), 'Sim', 'Não', '', '', '']);
+  }
+
+  notifyRegiane(
+    'Novo Check-up liberado — ' + email,
+    'O pagamento de ' + (nome || email) + ' (' + email + ') foi confirmado no Asaas e o acesso ao Check-up foi liberado automaticamente.'
+  );
 
   return { ok: true };
 }
