@@ -4,14 +4,21 @@
  * Veja INSTRUCOES.md para o passo a passo de publicação.
  */
 
-// Cole aqui o ID da planilha (fica na URL dela, entre /d/ e /edit)
-const SHEET_ID = 'COLE_AQUI_O_ID_DA_PLANILHA';
+// ID da planilha (fica na URL dela, entre /d/ e /edit)
+const SHEET_ID = '1-13n-7EhzF9b45OC--ijZBVQYMOJZr8PrWquUot1G7E';
 
 // Client ID do OAuth do Google (Sign In With Google), criado no Google Cloud Console
 const GOOGLE_CLIENT_ID = '288771217381-mt5g3dhdjhcoak6kphd1fhsarrkd44bc.apps.googleusercontent.com';
 
 // E-mail da Regiane, para onde vão os avisos de novo cadastro/acesso liberado
 const REGIANE_NOTIFICATION_EMAIL = 'COLE_AQUI_O_EMAIL_DA_REGIANE';
+
+// E-mails com acesso de administradora a qualquer área do site, sem precisar
+// estar cadastrado nas planilhas de pacientes.
+const ADMIN_EMAILS = ['divarebel.on@gmail.com', 'babadosdaaline@gmail.com', 'COLE_AQUI_O_EMAIL_DA_REGIANE'];
+function isAdmin(email) {
+  return ADMIN_EMAILS.map(normEmail).indexOf(normEmail(email)) !== -1;
+}
 
 function getSheet(name) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(name);
@@ -130,6 +137,9 @@ function actionLogin(email) {
  */
 function actionGoogleLoginPrograma(body) {
   const auth = verifyGoogleToken(body.idToken);
+  if (isAdmin(auth.email)) {
+    return { ok: true, nome: auth.nome, email: auth.email, admin: true };
+  }
   const p = findPatientRow(auth.email);
   if (!p) {
     return { ok: false, error: 'Não encontramos seu cadastro no Programa com esta conta Google. Fale com a Regiane.' };
@@ -146,7 +156,11 @@ function daysSince(dateVal) {
 }
 
 function actionDashboard(email) {
-  const p = findPatientRow(email);
+  let p = findPatientRow(email);
+  if (!p && isAdmin(email)) {
+    // administradora sem cadastro de paciente: mostra um painel de exemplo, sem erro.
+    p = { Nome: 'Administradora', PontosTotal: 0, RetornosRealizados: 0, ReceitasSalvas: 0, ProgressoPercent: 0, DataInicio: '', ProximoRetornoData: '', ProximoRetornoHora: '', PlanoTexto: 'Acesso de administradora — sem plano individual.' };
+  }
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
 
   const materiais = sheetToObjects(getSheet('Materiais')).filter(m => {
@@ -281,6 +295,9 @@ function findCheckupRow(email) {
  */
 function actionGoogleLoginCheckup(body) {
   const auth = verifyGoogleToken(body.idToken);
+  if (isAdmin(auth.email)) {
+    return { ok: true, nome: auth.nome, email: auth.email, admin: true, jaFezCheckup: false, respostasChecklist: null, respostasQuiz: null };
+  }
   const c = findCheckupRow(auth.email);
 
   if (!c) {
@@ -365,4 +382,86 @@ function actionAsaasWebhook(body) {
   );
 
   return { ok: true };
+}
+
+// ── CONFIGURAÇÃO INICIAL DA PLANILHA (rode uma vez, na mão) ──────
+//
+// No editor do Apps Script, selecione a função "setupSheetStructure" no
+// menu de funções (ao lado do botão ▶ Executar) e clique em Executar.
+// Isso cria as 7 abas, já com cabeçalho formatado nas cores da marca
+// (marsala/rosé) e uma linha de exemplo em cada uma. Pode rodar de novo
+// a qualquer momento — só recria os cabeçalhos, não apaga dados que já
+// tiverem sido adicionados abaixo da linha de exemplo.
+
+function setupSheetStructure() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const MARSALA = '#7A2A3B';
+  const MARSALA_DEEP = '#551D29';
+  const ROSE_MIST = '#F1DCDF';
+  const INK = '#3B2024';
+  const BG = '#FBF5F2';
+
+  function buildSheet(name, headers, sampleRow) {
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) sheet = ss.insertSheet(name);
+
+    sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 2), Math.max(sheet.getMaxColumns(), headers.length))
+      .setBackground(BG).setFontColor(INK).setFontFamily('Arial');
+
+    sheet.getRange(1, 1, 1, headers.length)
+      .setValues([headers])
+      .setBackground(MARSALA)
+      .setFontColor('#FFFFFF')
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setVerticalAlignment('middle')
+      .setHorizontalAlignment('center');
+    sheet.setRowHeight(1, 34);
+    sheet.setFrozenRows(1);
+
+    if (sampleRow) {
+      const r = sheet.getRange(2, 1, 1, sampleRow.length);
+      r.setValues([sampleRow]).setBackground(ROSE_MIST).setFontColor(MARSALA_DEEP).setFontStyle('italic');
+    }
+
+    for (let c = 1; c <= headers.length; c++) sheet.autoResizeColumn(c);
+    sheet.setTabColor(MARSALA);
+    return sheet;
+  }
+
+  buildSheet('Pacientes',
+    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal'],
+    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0]);
+
+  buildSheet('Materiais',
+    ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link'],
+    [1, 'TODOS', 'PDF', 'Planner alimentar semanal', 'Vale para todas as pacientes do Programa', 'https://']);
+
+  buildSheet('Comentarios', ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora'], null);
+
+  buildSheet('PontosLog', ['Id', 'Email', 'Tipo', 'Pontos', 'Data'], null);
+
+  buildSheet('Horarios', ['Data', 'Hora', 'Disponivel'], ['28/07/2026', '15h00', 'Sim']);
+
+  buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao'], null);
+
+  buildSheet('CheckupPacientes',
+    ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'RespostasChecklist', 'RespostasQuiz', 'DataCheckup'],
+    ['exemplo@checkup.com', 'Nome de Exemplo', new Date(), 'Sim', 'Não', '', '', '']);
+
+  // remove a aba padrão em branco, se existir e não for a única
+  ['Sheet1', 'Página1', 'Folha1'].forEach(n => {
+    const s = ss.getSheetByName(n);
+    if (s && ss.getSheets().length > 1) ss.deleteSheet(s);
+  });
+
+  // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
+  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Horarios', 'Agendamentos', 'Comentarios', 'PontosLog'];
+  ordem.forEach((nome, i) => {
+    const s = ss.getSheetByName(nome);
+    if (s) ss.setActiveSheet(s);
+    if (s) ss.moveActiveSheet(i + 1);
+  });
+
+  SpreadsheetApp.flush();
 }
