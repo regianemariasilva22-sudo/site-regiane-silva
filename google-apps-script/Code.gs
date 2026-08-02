@@ -111,6 +111,7 @@ function doPost(e) {
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
+    if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -194,6 +195,7 @@ function actionDashboard(email) {
     proximoRetornoData: p.ProximoRetornoData || '',
     proximoRetornoHora: p.ProximoRetornoHora || '',
     planoTexto: p.PlanoTexto || '',
+    planoPdfUrl: p.PlanoPdfUrl || '',
     pontosTotal: pontosTotal,
     totalInteracoes: totalInteracoes,
     creditoDisponivel: Math.floor(pontosTotal / 100) * 10,
@@ -259,7 +261,8 @@ function actionAdminListPatients(body) {
       pontosTotal: Number(p.PontosTotal) || 0,
       progressoPercent: Number(p.ProgressoPercent) || 0,
       temPlano: !!(p.PlanoTexto && String(p.PlanoTexto).trim()),
-      planoTexto: p.PlanoTexto || ''
+      planoTexto: p.PlanoTexto || '',
+      planoPdfUrl: p.PlanoPdfUrl || ''
     }))
   };
 }
@@ -282,6 +285,34 @@ function actionAdminSavePlan(body) {
     if (normEmail(data[i][emailCol]) === email) {
       sheet.getRange(i + 1, planoCol + 1).setValue(body.planoTexto || '');
       return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+/**
+ * A administradora envia o plano alimentar em PDF direto pelo site.
+ * O arquivo vai pro Google Drive dela e o link fica salvo na planilha,
+ * na coluna PlanoPdfUrl — a paciente vê um botão de baixar no Meu Plano.
+ */
+function actionAdminUploadPlanPdf(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const sheet = getSheet('Pacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const pdfCol = headers.indexOf('PlanoPdfUrl');
+
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      const bytes = Utilities.base64Decode(body.fileBase64);
+      const blob = Utilities.newBlob(bytes, 'application/pdf', body.fileName || 'plano.pdf');
+      const file = DriveApp.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      const url = file.getUrl();
+      sheet.getRange(i + 1, pdfCol + 1).setValue(url);
+      return { ok: true, url: url };
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
@@ -526,8 +557,8 @@ function setupSheetStructure() {
   }
 
   buildSheet('Pacientes',
-    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal', 'ReceitasSalvasIds'],
-    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '']);
+    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal', 'ReceitasSalvasIds', 'PlanoPdfUrl'],
+    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '', '']);
 
   buildSheet('Materiais',
     ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link'],

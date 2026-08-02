@@ -74,6 +74,11 @@
 
   <main class="mem-main">
 
+    <div id="impersonate-banner" style="display:none;background:var(--marsala);color:#fff;padding:12px 20px;border-radius:12px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <span>Visualizando como: <strong id="impersonate-name"></strong></span>
+      <a href="dashboard.html?tab=admin" style="color:#fff;text-decoration:underline;font-size:13px;">← Voltar ao Painel da Regiane</a>
+    </div>
+
     <!-- INÍCIO TAB -->
     <div id="tab-inicio">
       <h1 class="mem-hello" id="hello-title">Olá, seja bem-vinda 🌿</h1>
@@ -400,6 +405,9 @@
       <p class="mem-sub">Seu plano alimentar personalizado, atualizado conforme sua evolução.</p>
       <div class="mem-panel">
         <p class="card-text" id="plano-texto">Vou liberar seu plano atualizado logo após o seu próximo retorno em <strong>28 de julho</strong>. Enquanto isso, siga as orientações da última consulta.</p>
+        <div id="plano-pdf-wrap" style="margin-top:18px;display:none;">
+          <a id="plano-pdf-link" href="#" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Baixar plano em PDF &nbsp;→</a>
+        </div>
       </div>
     </div>
 
@@ -435,14 +443,26 @@
 <script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
 <script>
-  const patientEmail = sessionStorage.getItem('rs_programa_email');
+  const urlParams = new URLSearchParams(location.search);
+  const loggedInEmail = sessionStorage.getItem('rs_programa_email');
   const patientIdToken = sessionStorage.getItem('rs_programa_idtoken');
   const isAdminUser = sessionStorage.getItem('rs_programa_admin') === '1';
+  const impersonateEmail = urlParams.get('as');
+  const isImpersonating = !!(impersonateEmail && isAdminUser);
+  const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
   (function(){
     const nome = sessionStorage.getItem('rs_programa_nome');
+    if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
+    if(isImpersonating){
+      document.getElementById('impersonate-banner').style.display = 'flex';
+      document.getElementById('impersonate-name').textContent = impersonateEmail;
+      document.getElementById('mem-user-name').textContent = impersonateEmail.split('@')[0];
+      return;
+    }
     if(nome) document.getElementById('mem-user-name').textContent = nome;
     else if(patientEmail) document.getElementById('mem-user-name').textContent = patientEmail.split('@')[0];
-    if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
+    const tabParam = urlParams.get('tab');
+    if(tabParam) showTab(tabParam);
   })();
   document.getElementById('logout').addEventListener('click', function(e){
     e.preventDefault();
@@ -496,6 +516,10 @@
     document.getElementById('pontos-bar').style.width = (100 - d.faltamParaProximoCredito) + '%';
 
     if(d.planoTexto) document.getElementById('plano-texto').textContent = d.planoTexto;
+    if(d.planoPdfUrl){
+      document.getElementById('plano-pdf-wrap').style.display = 'block';
+      document.getElementById('plano-pdf-link').href = d.planoPdfUrl;
+    }
 
     if(d.materiais && d.materiais.length){
       const wrap = document.getElementById('materiais-pessoais');
@@ -654,8 +678,19 @@
           <span class="mli-tag" style="background:${p.temPlano ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.temPlano ? 'var(--marsala-deep)' : '#7A2222'};">${p.temPlano ? 'Com plano' : 'Sem plano — pendente'}</span>
         </div>
         <textarea class="admin-plano-input" style="width:100%;min-height:90px;margin-top:12px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">${p.planoTexto || ''}</textarea>
-        <button type="button" class="btn btn-primary btn-sm admin-plano-save" style="margin-top:10px;">Salvar plano</button>
-        <span class="admin-plano-status" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="btn btn-primary btn-sm admin-plano-save">Salvar plano</button>
+          <a class="btn btn-outline btn-sm" href="dashboard.html?as=${encodeURIComponent(p.email)}">Ver como paciente &nbsp;→</a>
+          <span class="admin-plano-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rose-mist);">
+          <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:6px;">
+            Plano em PDF${p.planoPdfUrl ? ' — <a href="'+p.planoPdfUrl+'" target="_blank" rel="noopener">ver atual</a>' : ' (nenhum enviado ainda)'}
+          </label>
+          <input type="file" accept="application/pdf" class="admin-pdf-input" />
+          <button type="button" class="btn btn-outline btn-sm admin-pdf-upload" style="margin-left:8px;">Enviar PDF</button>
+          <span class="admin-pdf-status" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
+        </div>
       `;
       const textarea = card.querySelector('.admin-plano-input');
       const saveBtn = card.querySelector('.admin-plano-save');
@@ -671,6 +706,25 @@
           status.textContent = r.error || 'Erro ao salvar.';
         }
       });
+
+      const pdfInput = card.querySelector('.admin-pdf-input');
+      const pdfBtn = card.querySelector('.admin-pdf-upload');
+      const pdfStatus = card.querySelector('.admin-pdf-status');
+      pdfBtn.addEventListener('click', async ()=>{
+        const file = pdfInput.files[0];
+        if(!file){ pdfStatus.textContent = 'Escolha um PDF primeiro.'; return; }
+        pdfBtn.disabled = true;
+        pdfStatus.textContent = 'Enviando...';
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result.split(',')[1];
+          const r = await apiPost('adminUploadPlanPdf', { idToken: patientIdToken, email: p.email, fileBase64: base64, fileName: file.name });
+          pdfBtn.disabled = false;
+          pdfStatus.textContent = r.ok ? 'PDF enviado ✓' : (r.error || 'Erro ao enviar PDF.');
+        };
+        reader.readAsDataURL(file);
+      });
+
       wrap.appendChild(card);
     });
     if(window.__rebindCursor) window.__rebindCursor();
