@@ -75,6 +75,8 @@
     if(result.ok){
       sessionStorage.setItem('rs_programa_email', result.email);
       sessionStorage.setItem('rs_programa_nome', result.nome || '');
+      sessionStorage.setItem('rs_programa_admin', result.admin ? '1' : '0');
+      sessionStorage.setItem('rs_programa_idtoken', response.credential);
       window.location.href = 'dashboard.html';
     } else {
       err.textContent = result.error || 'Não foi possível entrar com esta conta Google.';

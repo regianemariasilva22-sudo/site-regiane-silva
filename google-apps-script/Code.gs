@@ -64,6 +64,16 @@ function verifyGoogleToken(idToken) {
   return { email: normEmail(info.email), nome: info.name || info.email };
 }
 
+/**
+ * Verifica o token do Google e garante que quem está chamando é uma
+ * administradora (Regiane ou Aline). Lança erro se não for.
+ */
+function assertAdmin(idToken) {
+  const auth = verifyGoogleToken(idToken);
+  if (!isAdmin(auth.email)) throw new Error('Acesso restrito à administradora.');
+  return auth;
+}
+
 function notifyRegiane(assunto, corpo) {
   if (!REGIANE_NOTIFICATION_EMAIL || REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') !== -1) return;
   try {
@@ -98,6 +108,9 @@ function doPost(e) {
     if (action === 'googleLoginCheckup') return jsonResponse(actionGoogleLoginCheckup(body));
     if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
     if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
+    if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
+    if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
+    if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -189,6 +202,89 @@ function actionDashboard(email) {
       tipo: m.Tipo, titulo: m.Titulo, descricao: m.Descricao, link: m.Link
     }))
   };
+}
+
+/**
+ * Salva o "salvar receita" de uma paciente — idempotente (a mesma receita
+ * não conta pontos/contador duas vezes pra mesma pessoa) e atualiza o
+ * contador ReceitasSalvas automaticamente, sem a Regiane precisar mexer.
+ */
+function actionSaveRecipe(body) {
+  const email = normEmail(body.email);
+  const recipeId = String(body.recipeId || '').trim();
+  if (!recipeId) return { ok: false, error: 'Receita inválida.' };
+
+  const sheet = getSheet('Pacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const receitasCol = headers.indexOf('ReceitasSalvas');
+  const idsCol = headers.indexOf('ReceitasSalvasIds');
+
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      const idsAtuais = String(data[i][idsCol] || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (idsAtuais.indexOf(recipeId) !== -1) {
+        return { ok: true, jaSalva: true, receitasSalvas: Number(data[i][receitasCol]) || 0 };
+      }
+      idsAtuais.push(recipeId);
+      const novoTotal = (Number(data[i][receitasCol]) || 0) + 1;
+      sheet.getRange(i + 1, receitasCol + 1).setValue(novoTotal);
+      sheet.getRange(i + 1, idsCol + 1).setValue(idsAtuais.join(','));
+      addPoints(email, 'Receita salva: ' + (body.recipeTitle || recipeId), 2);
+      return { ok: true, jaSalva: false, receitasSalvas: novoTotal };
+    }
+  }
+  return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+// ── PAINEL DA ADMINISTRADORA ─────────────────────────────
+
+/**
+ * Lista todas as pacientes do Programa pra administradora — usado no
+ * "Painel da Regiane" dentro do próprio site, pra ela ver quem já tem
+ * plano alimentar cadastrado e quem ainda falta.
+ */
+function actionAdminListPatients(body) {
+  assertAdmin(body.idToken);
+  const pacientes = sheetToObjects(getSheet('Pacientes'));
+  return {
+    ok: true,
+    pacientes: pacientes.map(p => ({
+      email: p.Email,
+      nome: p.Nome,
+      diasAcompanhamento: daysSince(p.DataInicio),
+      retornosRealizados: Number(p.RetornosRealizados) || 0,
+      receitasSalvas: Number(p.ReceitasSalvas) || 0,
+      pontosTotal: Number(p.PontosTotal) || 0,
+      progressoPercent: Number(p.ProgressoPercent) || 0,
+      temPlano: !!(p.PlanoTexto && String(p.PlanoTexto).trim()),
+      planoTexto: p.PlanoTexto || ''
+    }))
+  };
+}
+
+/**
+ * A administradora adiciona/atualiza o plano alimentar de uma paciente
+ * direto pelo site — a planilha (coluna PlanoTexto) atualiza sozinha,
+ * sem ela precisar editar a planilha na mão.
+ */
+function actionAdminSavePlan(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const sheet = getSheet('Pacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const planoCol = headers.indexOf('PlanoTexto');
+
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, planoCol + 1).setValue(body.planoTexto || '');
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Paciente não encontrada.' };
 }
 
 // ── COMUNIDADE / COMENTÁRIOS ────────────────────────────
@@ -430,8 +526,8 @@ function setupSheetStructure() {
   }
 
   buildSheet('Pacientes',
-    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal'],
-    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0]);
+    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal', 'ReceitasSalvasIds'],
+    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '']);
 
   buildSheet('Materiais',
     ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link'],

@@ -56,6 +56,10 @@
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
         Calendário
       </a></li>
+      <li id="nav-admin" style="display:none;"><a href="#admin" onclick="showTab('admin');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M4 20c0-4 3.6-6.8 8-6.8s8 2.8 8 6.8"/></svg>
+        Painel da Regiane
+      </a></li>
     </ul>
     <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
     <div class="mem-user">
@@ -361,7 +365,29 @@
       <div class="identify-grid">
         <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Planner alimentar semanal</div><p class="card-text">Organize suas refeições com praticidade.</p></div>
         <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Guia de organização alimentar</div><p class="card-text">Passo a passo para simplificar o dia a dia.</p></div>
-        <div class="glass-card"><span class="card-num">Receitas</span><div class="card-title">Receituário funcional</div><p class="card-text">Receitas anti-inflamatórias e de fácil preparo.</p></div>
+      </div>
+
+      <h3 style="margin-top:40px;margin-bottom:16px;">Receituário funcional</h3>
+      <p class="card-text" style="margin-bottom:16px;">Salve as receitas que você quer guardar — elas contam pontos e aparecem no seu resumo.</p>
+      <div class="identify-grid" id="receitas-grid">
+        <div class="glass-card" data-recipe-id="bowl-anti-inflamatorio">
+          <span class="card-num">Receita</span>
+          <div class="card-title">Bowl anti-inflamatório</div>
+          <p class="card-text">Quinoa, cúrcuma, vegetais assados e molho de tahine.</p>
+          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
+        </div>
+        <div class="glass-card" data-recipe-id="overnight-oats-canela">
+          <span class="card-num">Receita</span>
+          <div class="card-title">Overnight oats de canela</div>
+          <p class="card-text">Aveia, chia, canela e leite vegetal — pronto na geladeira de um dia pro outro.</p>
+          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
+        </div>
+        <div class="glass-card" data-recipe-id="sopa-detox-gengibre">
+          <span class="card-num">Receita</span>
+          <div class="card-title">Sopa detox de gengibre</div>
+          <p class="card-text">Abóbora, gengibre e cúrcuma — ótima pra dias de intestino preso.</p>
+          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
+        </div>
       </div>
 
       <h3 id="materiais-pessoais-title" style="margin-top:40px;margin-bottom:16px;display:none;">Materiais indicados pra você</h3>
@@ -396,6 +422,13 @@
         <a href="https://wa.me/5511947841133?text=Ol%C3%A1%21%20Quero%20indicar%20uma%20amiga%20pra%20Regiane." target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-top:14px;">Indicar uma amiga &nbsp;→</a>
       </div>
     </div>
+
+    <!-- ADMIN TAB (só aparece pra Regiane/Aline) -->
+    <div id="tab-admin" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Painel da Regiane</h1>
+      <p class="mem-sub">Todas as pacientes do Programa. Quem ainda não tem plano cadastrado aparece com o aviso em destaque.</p>
+      <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
+    </div>
   </main>
 </div>
 
@@ -403,15 +436,20 @@
 <script src="../../assets/js/main.js"></script>
 <script>
   const patientEmail = sessionStorage.getItem('rs_programa_email');
+  const patientIdToken = sessionStorage.getItem('rs_programa_idtoken');
+  const isAdminUser = sessionStorage.getItem('rs_programa_admin') === '1';
   (function(){
     const nome = sessionStorage.getItem('rs_programa_nome');
     if(nome) document.getElementById('mem-user-name').textContent = nome;
     else if(patientEmail) document.getElementById('mem-user-name').textContent = patientEmail.split('@')[0];
+    if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
   })();
   document.getElementById('logout').addEventListener('click', function(e){
     e.preventDefault();
     sessionStorage.removeItem('rs_programa_email');
     sessionStorage.removeItem('rs_programa_nome');
+    sessionStorage.removeItem('rs_programa_admin');
+    sessionStorage.removeItem('rs_programa_idtoken');
     window.location.href = 'login.html';
   });
   function showTab(name){
@@ -423,6 +461,7 @@
     if(window.__rebindCursor) window.__rebindCursor();
     if(name==='comunidade') loadComments();
     if(name==='calendario') loadSlots();
+    if(name==='admin') loadAdminPatients();
   }
   document.querySelectorAll('.video-filter').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -561,6 +600,80 @@
     } else {
       alert(res.error || 'Não foi possível solicitar esse horário.');
     }
+  }
+
+  /* ── RECEITAS: salvar receita atualiza a planilha sozinho ── */
+  document.querySelectorAll('.recipe-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const card = btn.closest('[data-recipe-id]');
+      const recipeId = card.dataset.recipeId;
+      const recipeTitle = card.querySelector('.card-title').textContent;
+      if(!patientEmail){ alert('Faça login novamente.'); return; }
+      if(!apiConfigured()){ btn.textContent = 'Salva ✓'; btn.disabled = true; return; }
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+      const res = await apiPost('saveRecipe', { email: patientEmail, recipeId: recipeId, recipeTitle: recipeTitle });
+      if(res.ok){
+        btn.textContent = 'Salva ✓';
+        document.getElementById('stat-receitas').textContent = res.receitasSalvas;
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Salvar receita';
+        alert(res.error || 'Não foi possível salvar a receita.');
+      }
+    });
+  });
+
+  /* ── PAINEL DA REGIANE (admin) ── */
+  async function loadAdminPatients(){
+    const wrap = document.getElementById('admin-patients-list');
+    if(!apiConfigured() || !patientIdToken){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Painel disponível assim que o backend estiver publicado.</p>';
+      return;
+    }
+    const res = await apiPost('adminListPatients', { idToken: patientIdToken });
+    if(!res.ok){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">' + (res.error || 'Não foi possível carregar as pacientes.') + '</p>';
+      return;
+    }
+    if(!res.pacientes.length){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma paciente cadastrada ainda na aba Pacientes da planilha.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    res.pacientes.forEach(p=>{
+      const card = document.createElement('div');
+      card.className = 'mem-panel reveal in';
+      card.style.marginBottom = '16px';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <h3 style="margin:0;">${p.nome || p.email}</h3>
+            <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas</p>
+          </div>
+          <span class="mli-tag" style="background:${p.temPlano ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.temPlano ? 'var(--marsala-deep)' : '#7A2222'};">${p.temPlano ? 'Com plano' : 'Sem plano — pendente'}</span>
+        </div>
+        <textarea class="admin-plano-input" style="width:100%;min-height:90px;margin-top:12px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">${p.planoTexto || ''}</textarea>
+        <button type="button" class="btn btn-primary btn-sm admin-plano-save" style="margin-top:10px;">Salvar plano</button>
+        <span class="admin-plano-status" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
+      `;
+      const textarea = card.querySelector('.admin-plano-input');
+      const saveBtn = card.querySelector('.admin-plano-save');
+      const status = card.querySelector('.admin-plano-status');
+      saveBtn.addEventListener('click', async ()=>{
+        saveBtn.disabled = true;
+        const r = await apiPost('adminSavePlan', { idToken: patientIdToken, email: p.email, planoTexto: textarea.value });
+        saveBtn.disabled = false;
+        if(r.ok){
+          status.textContent = 'Plano salvo ✓';
+          card.querySelector('.mli-tag').textContent = textarea.value.trim() ? 'Com plano' : 'Sem plano — pendente';
+        } else {
+          status.textContent = r.error || 'Erro ao salvar.';
+        }
+      });
+      wrap.appendChild(card);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
   }
 </script>
 </body>
