@@ -416,31 +416,31 @@
 
   const CATEGORIA_INFO = {
     intestino: {
-      msg: 'Boa parte do que você marcou tem a ver com o intestino — inchaço, funcionamento irregular, retenção. O intestino influencia praticamente todo o organismo, e esses sinais, quando ignorados, tendem a evoluir para inflamação persistente e mais dificuldade de emagrecer, por mais que você ajuste a dieta sozinha. Isso pede uma investigação com exames pra ir direto à causa.',
+      msg: 'Boa parte do que você marcou tem a ver com o intestino. Na prática, isso costuma vir de duas coisas que conversam entre si: pouca fibra (de sementes como linhaça e chia, ou de verduras e legumes) e pouca água — sem os dois, o intestino trava, e muita gente nem percebe porque nunca prestou atenção na própria evacuação. Também pode ser disbiose intestinal: quando o intestino inflama e fermenta o que você come, dá aquela distensão que parece "a dieta não está funcionando", quando na verdade é o intestino pedindo ajuda. Intolerâncias (leite, glúten e ovo são as mais comuns) e o próprio estresse também mexem direto com o intestino.',
       produto: 'Consulta Funcional Completa',
       ctaText: 'Quero investigar meu intestino a fundo →',
       ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20intestino%20e%20quero%20agendar%20a%20Consulta%20Funcional%20Completa.'
     },
     metabolismo: {
-      msg: 'O que você marcou aponta bastante pro metabolismo — fome que volta rápido, cansaço após comer, a sensação de "fazer tudo certo" e não ver resultado, ou o efeito sanfona de sempre voltar ao peso anterior. Isso raramente se resolve com um ajuste pontual: sem acompanhamento, tende a se repetir, dieta após dieta.',
+      msg: 'O que você marcou aponta bastante pro metabolismo. Sono ruim desregula o ciclo circadiano e os hormônios da fome e da saciedade — grelina e leptina —, e isso sozinho já explica boa parte da dificuldade de emagrecer mesmo comendo "certo". Rotina alimentar desorganizada (comer muito cedo, ficar horas sem comer e compensar depois) também trava o metabolismo. Isso raramente se resolve com um ajuste pontual: sem acompanhamento de perto, tende a se repetir, dieta após dieta.',
       produto: 'Programa Reequilíbrio Funcional (90 dias)',
       ctaText: 'Quero conhecer o Programa 90 dias →',
       ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20metabolismo%20e%20quero%20conhecer%20o%20Programa%20Reequil%C3%ADbrio%20Funcional.'
     },
     comportamento: {
-      msg: 'Muito do que você marcou está ligado ao comportamento alimentar — comer rápido demais, compulsão por doce, humor que muda com a fome. Isso geralmente não se resolve só com força de vontade, e se ignorado tende a gerar mais culpa e mais ciclos de compulsão.',
+      msg: 'Muito do que você marcou está ligado ao comportamento alimentar — e isso quase sempre tem uma causa por trás, não é falta de força de vontade. Pode ser fome emocional (estresse, ansiedade, tédio), pode ser gatilho visual (ver comida em vídeo ou rede social gera vontade real, principalmente de estômago vazio), ou pode ser comida afetiva, aquela que lembra infância e conforto. Se ignorado, esse padrão tende a gerar mais culpa e mais ciclos de compulsão.',
       produto: 'Consulta Funcional Completa',
       ctaText: 'Quero entender minha relação com a comida →',
       ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pro%20comportamento%20alimentar%20e%20quero%20agendar%20a%20Consulta%20Funcional%20Completa.'
     },
     rotina: {
-      msg: 'O que você marcou tem a ver principalmente com hábitos de rotina — água, horários das refeições. São sinais mais simples isoladamente, mas que também se acumulam com o tempo se ficarem sem direção certa.',
+      msg: 'O que você marcou tem a ver principalmente com hábitos de rotina — água e organização das refeições. Pouca água já engana o corpo fazendo parecer fome quando é sede, e horários desorganizados (café da manhã muito cedo, almoço tarde) geram compensação exagerada na próxima refeição. São sinais mais simples isoladamente, mas que se acumulam com o tempo se ficarem sem direção certa.',
       produto: 'Consultoria Estratégica Nutricional',
       ctaText: 'Quero minha Consultoria Estratégica →',
       ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20apontam%20pra%20rotina%20e%20quero%20saber%20mais%20sobre%20a%20Consultoria%20Estrat%C3%A9gica.'
     },
     misto: {
-      msg: 'Você marcou sinais espalhados em áreas diferentes do organismo — o que também é comum, e geralmente indica que o desequilíbrio está afetando mais de uma frente ao mesmo tempo.',
+      msg: 'Você marcou sinais espalhados em áreas diferentes do organismo — o que também é comum, e geralmente indica que o desequilíbrio está afetando mais de uma frente ao mesmo tempo (sono, intestino, rotina e emocional costumam andar juntos).',
       produto: 'Consultoria Estratégica Nutricional',
       ctaText: 'Quero minha Consultoria Estratégica →',
       ctaMsg: 'Ol%C3%A1%2C%20Regiane%21%20Fiz%20o%20checklist%20do%20Check-up%2C%20meus%20sinais%20est%C3%A3o%20espalhados%20e%20quero%20saber%20mais%20sobre%20a%20Consultoria%20Estrat%C3%A9gica.'
@@ -490,12 +490,41 @@
   })();
 
   /* ── QUIZ ── */
+  const QUIZ_FATORES = {
+    q1: {
+      nome: 'beliscos fora de hora',
+      msg: 'O fator que mais aparece nas suas respostas são os beliscos fora de hora. Eles quase sempre têm uma causa raiz por trás: pode ser hormonal (sono desregulado bagunçando os hormônios da fome e da saciedade), pode ser falta de fibra ou de proteína na alimentação, pode ser pouca água, ou pode ser emocional. O primeiro passo é prestar atenção: quando bater a vontade de beliscar, pergunte pra si mesma se é fome real ou outra coisa.'
+    },
+    q2: {
+      nome: 'gatilho visual e emocional',
+      msg: 'O fator que mais aparece nas suas respostas é o gatilho visual e emocional — ver comida em vídeo ou rede social e sentir vontade real de comer o que está sendo mostrado, principalmente quando o estômago está vazio. Entra aí também a comida afetiva, aquela que lembra infância e conforto, que não precisa ser cortada, mas merece atenção na quantidade e na frequência.'
+    },
+    q3: {
+      nome: 'organização da rotina',
+      msg: 'O fator que mais aparece nas suas respostas é a organização da rotina alimentar. Ficar muitas horas sem comer (café da manhã muito cedo e almoço só à tarde, por exemplo) gera uma compensação natural na próxima refeição — o corpo cobra depois o que não recebeu antes. Isso também abre espaço pros beliscos ao longo do dia.'
+    },
+    q4: {
+      nome: 'hidratação',
+      msg: 'O fator que mais aparece nas suas respostas é a hidratação. Pouca água faz o corpo confundir sede com fome, causa inchaço e retenção de líquido, e ainda prejudica o intestino. O cálculo real de água é o seu peso vezes 35ml por dia, bebido aos poucos ao longo do dia — nunca tudo de uma vez.'
+    },
+    q5: {
+      nome: 'fome emocional',
+      msg: 'O fator que mais aparece nas suas respostas é a fome emocional — estresse, ansiedade ou tédio te levando pra comida, geralmente carboidrato. Às vezes dá pra identificar na hora ("estou comendo porque estou estressada"), às vezes não. De qualquer forma, isso raramente se resolve só na base da força de vontade.'
+    },
+    q6: {
+      nome: 'sono',
+      msg: 'O fator que mais aparece nas suas respostas é o sono. Sono maroto desregula o ciclo circadiano e a melatonina, e isso bagunça diretamente os hormônios da fome. Na prática: mais vontade de doce e carboidrato no dia seguinte, mais dificuldade de emagrecer mesmo comendo direito, e mais cansaço puxando pra compensar com comida.'
+    }
+  };
+  const QUIZ_PRIORIDADE = ['q6','q4','q5','q2','q3','q1'];
+
   function calcQuiz(){
     const names = ['q1','q2','q3','q4','q5','q6'];
+    const valores = {};
     let total = 0, answered = 0;
     names.forEach(n=>{
       const sel = document.querySelector(`input[name="${n}"]:checked`);
-      if(sel){ total += parseInt(sel.value,10); answered++; }
+      if(sel){ valores[n] = parseInt(sel.value,10); total += valores[n]; answered++; }
     });
     if(answered < names.length){
       alert('Responda todas as perguntas para ver o resultado.');
@@ -504,10 +533,17 @@
     document.getElementById('quiz-questions').style.display='none';
     const result = document.getElementById('quiz-result');
     result.style.display='block';
-    let msg;
-    if(total<=5){ msg = `Sua pontuação foi ${total} de 18. Seus hábitos de rotina já estão bem alinhados — talvez falte só um ajuste fino para destravar seus resultados.`; }
-    else if(total<=11){ msg = `Sua pontuação foi ${total} de 18. Você tem alguns hábitos de rotina sabotando seus resultados sem perceber — vale a pena entender quais.`; }
-    else { msg = `Sua pontuação foi ${total} de 18. Seus hábitos de rotina estão pesando bastante contra você. Vale muito a pena investigarmos isso juntas.`; }
+
+    const max = Math.max(...Object.values(valores));
+    const dominante = QUIZ_PRIORIDADE.find(q => valores[q] === max);
+    const fator = QUIZ_FATORES[dominante];
+
+    let severidade;
+    if(total<=5){ severidade = 'No geral, seus hábitos de rotina já estão bem alinhados — talvez falte só um ajuste fino pra destravar de vez.'; }
+    else if(total<=11){ severidade = 'Some isso a mais alguns hábitos que ainda sabotam seus resultados sem você perceber — vale a pena entender a fundo o seu caso.'; }
+    else { severidade = 'Esse conjunto de hábitos pesa bastante contra você agora — o ideal é um acompanhamento próximo pra reorganizar isso com segurança.'; }
+
+    const msg = `${fator.msg} ${severidade}`;
     document.getElementById('quiz-result-text').textContent = msg;
   }
 </script>
