@@ -11,11 +11,11 @@ const SHEET_ID = '1-13n-7EhzF9b45OC--ijZBVQYMOJZr8PrWquUot1G7E';
 const GOOGLE_CLIENT_ID = '288771217381-mt5g3dhdjhcoak6kphd1fhsarrkd44bc.apps.googleusercontent.com';
 
 // E-mail da Regiane, para onde vão os avisos de novo cadastro/acesso liberado
-const REGIANE_NOTIFICATION_EMAIL = 'COLE_AQUI_O_EMAIL_DA_REGIANE';
+const REGIANE_NOTIFICATION_EMAIL = 'regianemariasilva22@gmail.com';
 
 // E-mails com acesso de administradora a qualquer área do site, sem precisar
 // estar cadastrado nas planilhas de pacientes.
-const ADMIN_EMAILS = ['divarebel.on@gmail.com', 'babadosdaaline@gmail.com', 'COLE_AQUI_O_EMAIL_DA_REGIANE'];
+const ADMIN_EMAILS = ['divarebel.on@gmail.com', 'babadosdaaline@gmail.com', 'regianemariasilva22@gmail.com'];
 function isAdmin(email) {
   return ADMIN_EMAILS.map(normEmail).indexOf(normEmail(email)) !== -1;
 }
