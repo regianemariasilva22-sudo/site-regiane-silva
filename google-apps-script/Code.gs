@@ -92,6 +92,8 @@ function doGet(e) {
     if (action === 'dashboard') return jsonResponse(actionDashboard(e.parameter.email));
     if (action === 'comments') return jsonResponse(actionComments(e.parameter.postId));
     if (action === 'slots') return jsonResponse(actionSlots());
+    if (action === 'checkAccess') return jsonResponse(actionCheckAccess(e.parameter.email, e.parameter.area));
+    if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(e.parameter.email));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -115,6 +117,7 @@ function doPost(e) {
     if (action === 'adminListPendingBookings') return jsonResponse(actionAdminListPendingBookings(body));
     if (action === 'adminConfirmBooking') return jsonResponse(actionAdminConfirmBooking(body));
     if (action === 'adminRejectBooking') return jsonResponse(actionAdminRejectBooking(body));
+    if (action === 'adminListCheckupPatients') return jsonResponse(actionAdminListCheckupPatients(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -250,6 +253,21 @@ function actionSaveRecipe(body) {
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+/**
+ * Checagem leve (sem token) usada pelo site pra saber, de tempos em tempos
+ * enquanto a página está aberta, se aquele e-mail ainda está cadastrado —
+ * se a Regiane excluir a linha da planilha, o site desloga sozinho.
+ */
+function actionCheckAccess(email, area) {
+  if (isAdmin(email)) return { ok: true };
+  if (area === 'checkup') {
+    const c = findCheckupRow(email);
+    if (!c || String(c.Liberado).trim().toLowerCase() !== 'sim') return { ok: false };
+    return { ok: true };
+  }
+  return { ok: !!findPatientRow(email) };
 }
 
 // ── PAINEL DA ADMINISTRADORA ─────────────────────────────
@@ -608,8 +626,45 @@ function actionGoogleLoginCheckup(body) {
 }
 
 /**
+ * Devolve o status do Check-up de um e-mail (se já respondeu e quais foram
+ * as respostas) — usado tanto pela própria paciente reabrindo a página
+ * quanto pela Regiane no "ver como paciente" do Painel dela.
+ */
+function actionCheckupDashboard(email) {
+  const c = findCheckupRow(email);
+  if (!c) return { ok: false, error: 'Check-up não encontrado.' };
+  return {
+    ok: true,
+    nome: c.Nome || '',
+    jaFezCheckup: String(c.JaFezCheckup).trim().toLowerCase() === 'sim',
+    respostasChecklist: c.RespostasChecklist ? JSON.parse(c.RespostasChecklist) : null,
+    respostasQuiz: c.RespostasQuiz ? JSON.parse(c.RespostasQuiz) : null,
+    dataCheckup: c.DataCheckup || ''
+  };
+}
+
+/**
+ * Monta um texto legível com as respostas do checklist/quiz, pra mandar
+ * por e-mail pra paciente e pra Regiane.
+ */
+function formatCheckupRespostas(checklist, quiz) {
+  let txt = '';
+  if (checklist && checklist.length) {
+    txt += 'Sinais marcados no checklist:\n';
+    checklist.forEach(item => { txt += '- ' + item + '\n'; });
+    txt += '\n';
+  }
+  if (quiz && Object.keys(quiz).length) {
+    txt += 'Respostas do quiz:\n';
+    Object.keys(quiz).forEach(pergunta => { txt += '- ' + pergunta + ': ' + quiz[pergunta] + '\n'; });
+  }
+  return txt || '(sem respostas registradas)';
+}
+
+/**
  * Salva as respostas do quiz/checklist do Check-up — só pode ser feito UMA vez
  * por e-mail. Depois disso, o login sempre retorna o resultado já salvo.
+ * Manda uma cópia das respostas por e-mail pra paciente e pra Regiane.
  */
 function actionSubmitCheckup(body) {
   const auth = verifyGoogleToken(body.idToken);
@@ -623,9 +678,24 @@ function actionSubmitCheckup(body) {
   const headers = sheet.getDataRange().getValues()[0];
   const row = c._row;
   sheet.getRange(row, headers.indexOf('JaFezCheckup') + 1).setValue('Sim');
-  sheet.getRange(row, headers.indexOf('RespostasChecklist') + 1).setValue(JSON.stringify(body.respostasChecklist || {}));
+  sheet.getRange(row, headers.indexOf('RespostasChecklist') + 1).setValue(JSON.stringify(body.respostasChecklist || []));
   sheet.getRange(row, headers.indexOf('RespostasQuiz') + 1).setValue(JSON.stringify(body.respostasQuiz || {}));
   sheet.getRange(row, headers.indexOf('DataCheckup') + 1).setValue(new Date());
+
+  const nome = c.Nome || auth.nome || auth.email;
+  const resumo = formatCheckupRespostas(body.respostasChecklist, body.respostasQuiz);
+
+  try {
+    MailApp.sendEmail(auth.email, 'Suas respostas do Check-up Alimentar — Regiane Silva',
+      'Oi, ' + nome + '! Aqui está uma cópia das suas respostas no Check-up Alimentar Funcional:\n\n' + resumo);
+  } catch (err) {
+    // não deixa o fluxo principal quebrar se o e-mail falhar
+  }
+
+  notifyRegiane(
+    'Check-up respondido — ' + nome,
+    nome + ' (' + auth.email + ') acabou de responder o Check-up. Respostas:\n\n' + resumo
+  );
 
   return { ok: true };
 }
@@ -672,6 +742,28 @@ function actionAsaasWebhook(body) {
   );
 
   return { ok: true };
+}
+
+/**
+ * Lista todas as pacientes do Check-up pra administradora — usado no
+ * Painel da Regiane da Área do Check-up, incluindo as respostas de quem
+ * já respondeu, pra ela ter controle sem precisar abrir a planilha.
+ */
+function actionAdminListCheckupPatients(body) {
+  assertAdmin(body.idToken);
+  const pacientes = sheetToObjects(getSheet('CheckupPacientes'));
+  return {
+    ok: true,
+    pacientes: pacientes.map(c => ({
+      email: c.Email,
+      nome: c.Nome,
+      liberado: String(c.Liberado).trim().toLowerCase() === 'sim',
+      jaFezCheckup: String(c.JaFezCheckup).trim().toLowerCase() === 'sim',
+      dataCheckup: c.DataCheckup || '',
+      respostasChecklist: c.RespostasChecklist ? JSON.parse(c.RespostasChecklist) : null,
+      respostasQuiz: c.RespostasQuiz ? JSON.parse(c.RespostasQuiz) : null
+    }))
+  };
 }
 
 // ── CONFIGURAÇÃO INICIAL DA PLANILHA (rode uma vez, na mão) ──────
@@ -731,8 +823,6 @@ function setupSheetStructure() {
 
   buildSheet('PontosLog', ['Id', 'Email', 'Tipo', 'Pontos', 'Data'], null);
 
-  buildSheet('Horarios', ['Data', 'Hora', 'Disponivel'], ['28/07/2026', '15h00', 'Sim']);
-
   buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao', 'Nome', 'IsoInicio'], null);
 
   buildSheet('CheckupPacientes',
@@ -746,7 +836,7 @@ function setupSheetStructure() {
   });
 
   // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
-  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Horarios', 'Agendamentos', 'Comentarios', 'PontosLog'];
+  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog'];
   ordem.forEach((nome, i) => {
     const s = ss.getSheetByName(nome);
     if (s) ss.setActiveSheet(s);

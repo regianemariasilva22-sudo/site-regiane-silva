@@ -76,6 +76,8 @@
       sessionStorage.setItem('rs_checkup_email', result.email);
       sessionStorage.setItem('rs_checkup_nome', result.nome || '');
       sessionStorage.setItem('rs_checkup_ja_fez', result.jaFezCheckup ? '1' : '0');
+      sessionStorage.setItem('rs_checkup_admin', result.admin ? '1' : '0');
+      sessionStorage.setItem('rs_checkup_idtoken', response.credential);
       window.location.href = 'dashboard.html';
     } else {
       err.textContent = result.error || 'Não foi possível entrar com esta conta Google.';

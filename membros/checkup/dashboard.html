@@ -80,6 +80,10 @@
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         Próximo Passo
       </a></li>
+      <li id="nav-admin" style="display:none;"><a href="#admin" onclick="showTab('admin');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M4 20c0-4 3.6-6.8 8-6.8s8 2.8 8 6.8"/></svg>
+        Painel da Regiane
+      </a></li>
     </ul>
     <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
     <div class="mem-user">
@@ -93,6 +97,11 @@
   </aside>
 
   <main class="mem-main">
+
+    <div id="impersonate-banner" style="display:none;background:var(--marsala);color:#fff;padding:12px 20px;border-radius:12px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <span>Visualizando como: <strong id="impersonate-name"></strong></span>
+      <a href="dashboard.html?tab=admin" style="color:#fff;text-decoration:underline;font-size:13px;">← Voltar ao Painel da Regiane</a>
+    </div>
 
     <!-- VIDEO -->
     <div id="tab-video">
@@ -350,20 +359,66 @@
         </div>
       </div>
     </div>
+
+    <!-- ADMIN TAB (só aparece pra Regiane/Aline) -->
+    <div id="tab-admin" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Painel da Regiane</h1>
+      <p class="mem-sub">Todas as pessoas que fizeram o Check-up, com as respostas de quem já respondeu.</p>
+      <div id="admin-checkup-list"><p class="card-text" style="color:var(--muted);">Carregando...</p></div>
+    </div>
   </main>
 </div>
 
+<script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
 <script>
+  const urlParams = new URLSearchParams(location.search);
+  const loggedInEmail = sessionStorage.getItem('rs_checkup_email');
+  const patientIdToken = sessionStorage.getItem('rs_checkup_idtoken');
+  const isAdminUser = sessionStorage.getItem('rs_checkup_admin') === '1';
+  const impersonateEmail = urlParams.get('as');
+  const isImpersonating = !!(impersonateEmail && isAdminUser);
+  const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
+
   (function(){
-    const email = sessionStorage.getItem('rs_checkup_email');
-    if(email) document.getElementById('mem-user-name').textContent = email.split('@')[0];
+    if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
+    if(isImpersonating){
+      document.getElementById('impersonate-banner').style.display = 'flex';
+      document.getElementById('impersonate-name').textContent = impersonateEmail;
+      document.getElementById('mem-user-name').textContent = impersonateEmail.split('@')[0];
+    } else if(patientEmail){
+      document.getElementById('mem-user-name').textContent = patientEmail.split('@')[0];
+    }
+    const tabParam = urlParams.get('tab');
+    if(tabParam) showTab(tabParam);
   })();
+
   document.getElementById('logout').addEventListener('click', function(e){
     e.preventDefault();
     sessionStorage.removeItem('rs_checkup_email');
+    sessionStorage.removeItem('rs_checkup_nome');
+    sessionStorage.removeItem('rs_checkup_ja_fez');
+    sessionStorage.removeItem('rs_checkup_admin');
+    sessionStorage.removeItem('rs_checkup_idtoken');
     window.location.href = 'login.html';
   });
+
+  /* ── Confere de tempos em tempos se o acesso ainda está liberado —
+     se a Regiane excluir/desmarcar o Liberado na planilha, desloga sozinho. ── */
+  if(apiConfigured() && loggedInEmail && !isImpersonating){
+    setInterval(async ()=>{
+      const r = await apiGet('checkAccess', { email: loggedInEmail, area: 'checkup' });
+      if(r && r.ok === false){
+        sessionStorage.removeItem('rs_checkup_email');
+        sessionStorage.removeItem('rs_checkup_nome');
+        sessionStorage.removeItem('rs_checkup_ja_fez');
+        sessionStorage.removeItem('rs_checkup_admin');
+        sessionStorage.removeItem('rs_checkup_idtoken');
+        window.location.href = 'login.html';
+      }
+    }, 3 * 60 * 1000);
+  }
+
   function showTab(name){
     document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
@@ -371,7 +426,28 @@
     if(tab){ tab.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
     if(event && event.currentTarget) event.currentTarget.classList.add('active');
     if(window.__rebindCursor) window.__rebindCursor();
+    if(name==='admin') loadAdminCheckupPatients();
   }
+
+  /* ── Carrega o status real do Check-up (se já respondeu) — usado tanto
+     pela própria paciente reabrindo a página quanto no "ver como paciente". ── */
+  async function loadCheckupStatus(){
+    if(!apiConfigured() || !patientEmail) return;
+    const r = await apiGet('checkupDashboard', { email: patientEmail });
+    if(!r.ok) return;
+    if(r.jaFezCheckup){
+      const jaRespondeuMsg = document.createElement('p');
+      jaRespondeuMsg.className = 'card-text';
+      jaRespondeuMsg.style.cssText = 'margin-bottom:16px;padding:14px 18px;border-radius:12px;background:var(--rose-mist);color:var(--marsala-deep);font-weight:600;';
+      jaRespondeuMsg.textContent = 'Você já respondeu o Check-up em ' + (r.dataCheckup || 'uma data anterior') + '. Suas respostas já foram enviadas por e-mail pra você e pra Regiane.';
+      const materiaisTab = document.getElementById('tab-materiais');
+      if(materiaisTab && !document.getElementById('ja-respondeu-aviso')){
+        jaRespondeuMsg.id = 'ja-respondeu-aviso';
+        materiaisTab.insertBefore(jaRespondeuMsg, materiaisTab.querySelector('.identify-grid'));
+      }
+    }
+  }
+  loadCheckupStatus();
 
   /* ── MATERIAIS: abrir/fechar ── */
   function openMat(name){
@@ -545,6 +621,82 @@
 
     const msg = `${fator.msg} ${severidade}`;
     document.getElementById('quiz-result-text').textContent = msg;
+
+    enviarRespostasCheckup(names, valores);
+  }
+
+  /* ── Manda as respostas (checklist + quiz) pro backend, que salva na
+     planilha e envia por e-mail pra paciente e pra Regiane. Só funciona
+     pra quem está logada de verdade (não no "ver como paciente"). ── */
+  async function enviarRespostasCheckup(quizNames, quizValores){
+    if(!apiConfigured() || !patientIdToken || isImpersonating) return;
+
+    const respostasChecklist = Array.from(document.querySelectorAll('#checklist-items input:checked'))
+      .map(inp => SINAIS[parseInt(inp.dataset.idx,10)].t);
+
+    const perguntasQuiz = {
+      q1: 'Com que frequência você belisca entre as refeições sem sentir fome de verdade?',
+      q2: 'Vídeos/programas de comida geram vontade de comer diferente do planejado?',
+      q3: 'Você come nos mesmos horários todos os dias?',
+      q4: 'Quantos copos de água você bebe por dia, em média?',
+      q5: 'Você usa a comida para lidar com estresse, ansiedade ou tristeza?',
+      q6: 'Quantas horas você dorme, em média, por noite?'
+    };
+    const respostasQuiz = {};
+    quizNames.forEach(n => { respostasQuiz[perguntasQuiz[n]] = quizValores[n]; });
+
+    await apiPost('submitCheckup', { idToken: patientIdToken, respostasChecklist, respostasQuiz });
+  }
+
+  /* ── PAINEL DA REGIANE (admin) ── */
+  async function loadAdminCheckupPatients(){
+    const wrap = document.getElementById('admin-checkup-list');
+    if(!apiConfigured() || !patientIdToken){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Painel disponível assim que o backend estiver publicado.</p>';
+      return;
+    }
+    const res = await apiPost('adminListCheckupPatients', { idToken: patientIdToken });
+    if(!res.ok){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">' + (res.error || 'Não foi possível carregar as pacientes.') + '</p>';
+      return;
+    }
+    if(!res.pacientes.length){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma paciente cadastrada ainda na aba CheckupPacientes da planilha.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    res.pacientes.forEach(p=>{
+      const card = document.createElement('div');
+      card.className = 'mem-panel reveal in';
+      card.style.marginBottom = '16px';
+      let respostasHtml = '<p class="card-text" style="color:var(--muted);margin-top:10px;">Ainda não respondeu.</p>';
+      if(p.jaFezCheckup){
+        let bloco = '';
+        if(p.respostasChecklist && p.respostasChecklist.length){
+          bloco += '<strong>Checklist:</strong><ul style="margin:6px 0 10px 18px;">' + p.respostasChecklist.map(t=>'<li>'+t+'</li>').join('') + '</ul>';
+        }
+        if(p.respostasQuiz && Object.keys(p.respostasQuiz).length){
+          bloco += '<strong>Quiz:</strong><ul style="margin:6px 0 0 18px;">' + Object.keys(p.respostasQuiz).map(q=>'<li>'+q+' — resposta: '+p.respostasQuiz[q]+'</li>').join('') + '</ul>';
+        }
+        respostasHtml = '<div class="card-text" style="margin-top:10px;font-size:13px;">' + (bloco || 'Sem detalhes salvos.') + '</div>';
+      }
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <h3 style="margin:0;">${p.nome || p.email}</h3>
+            <p class="card-text" style="margin:2px 0 0;">${p.email}${p.dataCheckup ? ' · respondeu em ' + p.dataCheckup : ''}</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="mli-tag" style="background:${p.liberado ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.liberado ? 'var(--marsala-deep)' : '#7A2222'};">${p.liberado ? 'Liberado' : 'Não liberado'}</span>
+            <span class="mli-tag" style="background:${p.jaFezCheckup ? 'var(--rose-mist)' : '#eee'};color:${p.jaFezCheckup ? 'var(--marsala-deep)' : '#999'};">${p.jaFezCheckup ? 'Respondeu' : 'Pendente'}</span>
+          </div>
+        </div>
+        ${respostasHtml}
+        <a href="dashboard.html?as=${encodeURIComponent(p.email)}" class="btn btn-outline btn-sm" style="margin-top:12px;">Ver como paciente &nbsp;→</a>
+      `;
+      wrap.appendChild(card);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
   }
 </script>
 </body>

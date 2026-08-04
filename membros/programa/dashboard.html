@@ -478,6 +478,21 @@
     sessionStorage.removeItem('rs_programa_idtoken');
     window.location.href = 'login.html';
   });
+
+  /* ── Confere de tempos em tempos se o cadastro ainda existe na planilha —
+     se a Regiane excluir a paciente, o site desloga sozinho. ── */
+  if(apiConfigured() && loggedInEmail && !isImpersonating){
+    setInterval(async ()=>{
+      const r = await apiGet('checkAccess', { email: loggedInEmail, area: 'programa' });
+      if(r && r.ok === false){
+        sessionStorage.removeItem('rs_programa_email');
+        sessionStorage.removeItem('rs_programa_nome');
+        sessionStorage.removeItem('rs_programa_admin');
+        sessionStorage.removeItem('rs_programa_idtoken');
+        window.location.href = 'login.html';
+      }
+    }, 3 * 60 * 1000);
+  }
   function showTab(name){
     document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
