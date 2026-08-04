@@ -112,7 +112,7 @@
               <div class="mli-title">Retorno de acompanhamento</div>
               <div class="mli-sub" id="proximo-retorno-sub">28 de julho · 15h00 · Online</div>
             </div>
-            <div class="mli-tag">Agendado</div>
+            <div class="mli-tag" id="proximo-retorno-tag" style="display:none;">Agendado</div>
           </div>
           <div class="mem-list-item">
             <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
@@ -421,6 +421,7 @@
       </div>
 
       <h3 style="margin-top:34px;margin-bottom:16px;">Agendar novo retorno</h3>
+      <p class="card-text" style="margin-bottom:16px;">Horários direto da agenda da Regiane — ao escolher, a consulta já fica confirmada na hora.</p>
       <div class="mem-panel" id="calendario-slots">
         <p class="card-text" style="color:var(--muted);">Carregando horários disponíveis...</p>
       </div>
@@ -435,6 +436,11 @@
     <div id="tab-admin" style="display:none;">
       <h1 class="mem-hello" style="font-size:28px;">Painel da Regiane</h1>
       <p class="mem-sub">Todas as pacientes do Programa. Quem ainda não tem plano cadastrado aparece com o aviso em destaque.</p>
+
+      <h3 style="margin-bottom:14px;">Solicitações de agendamento</h3>
+      <div id="admin-bookings-list" style="margin-bottom:36px;"><p class="card-text" style="color:var(--muted);">Carregando solicitações...</p></div>
+
+      <h3 style="margin-bottom:14px;">Pacientes</h3>
       <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
     </div>
   </main>
@@ -481,7 +487,7 @@
     if(window.__rebindCursor) window.__rebindCursor();
     if(name==='comunidade') loadComments();
     if(name==='calendario') loadSlots();
-    if(name==='admin') loadAdminPatients();
+    if(name==='admin'){ loadAdminBookings(); loadAdminPatients(); }
   }
   document.querySelectorAll('.video-filter').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -507,6 +513,22 @@
       const sub = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '') + ' · Online';
       document.getElementById('proximo-retorno-sub').textContent = sub;
       document.getElementById('calendario-retorno-sub').textContent = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '');
+    }
+
+    if(d.agendamentoStatus){
+      const tag = document.getElementById('proximo-retorno-tag');
+      const sub = document.getElementById('proximo-retorno-sub');
+      sub.textContent = d.agendamentoData + ' · ' + d.agendamentoHora + ' · Online';
+      tag.style.display = 'inline-flex';
+      if(d.agendamentoStatus === 'solicitado'){
+        tag.textContent = 'Aguardando confirmação';
+        tag.style.background = '#FFF3CD';
+        tag.style.color = '#7A5B00';
+      } else if(d.agendamentoStatus === 'confirmado'){
+        tag.textContent = 'Confirmado';
+        tag.style.background = 'var(--rose-mist)';
+        tag.style.color = 'var(--marsala-deep)';
+      }
     }
 
     document.getElementById('pontos-total').textContent = d.pontosTotal;
@@ -609,17 +631,18 @@
       item.className = 'mem-list-item';
       item.innerHTML = `<div class="mli-icon">📅</div><div><div class="mli-title"></div></div><button type="button" class="btn btn-outline btn-sm mli-book-btn">Solicitar &nbsp;→</button>`;
       item.querySelector('.mli-title').textContent = s.data + ' · ' + s.hora;
-      item.querySelector('.mli-book-btn').addEventListener('click', ()=>bookSlot(s.data, s.hora));
+      item.querySelector('.mli-book-btn').addEventListener('click', ()=>bookSlot(s.iso, s.data, s.hora));
       wrap.appendChild(item);
     });
     if(window.__rebindCursor) window.__rebindCursor();
   }
 
-  async function bookSlot(data, hora){
+  async function bookSlot(iso, data, hora){
     if(!patientEmail){ alert('Faça login novamente para agendar.'); return; }
-    const res = await apiPost('bookSlot', { email: patientEmail, data: data, hora: hora });
+    const res = await apiPost('bookSlot', { email: patientEmail, iso: iso });
     if(res.ok){
-      alert('Horário solicitado! A Regiane vai confirmar em breve.');
+      alert('Horário solicitado pra ' + data + ' às ' + hora + '! Assim que a Regiane confirmar, você vai ver aqui e vai cair na sua agenda também.');
+      loadDashboardData();
       loadSlots();
     } else {
       alert(res.error || 'Não foi possível solicitar esse horário.');
@@ -649,6 +672,57 @@
   });
 
   /* ── PAINEL DA REGIANE (admin) ── */
+  async function loadAdminBookings(){
+    const wrap = document.getElementById('admin-bookings-list');
+    if(!apiConfigured() || !patientIdToken){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Painel disponível assim que o backend estiver publicado.</p>';
+      return;
+    }
+    const res = await apiPost('adminListPendingBookings', { idToken: patientIdToken });
+    if(!res.ok){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">' + (res.error || 'Não foi possível carregar as solicitações.') + '</p>';
+      return;
+    }
+    if(!res.pendentes.length){
+      wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma solicitação pendente no momento.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    res.pendentes.forEach(b=>{
+      const card = document.createElement('div');
+      card.className = 'mem-panel reveal in';
+      card.style.marginBottom = '12px';
+      card.style.background = '#FFF3CD';
+      card.style.borderColor = '#F0D98C';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h3 style="margin:0;">${b.nome}</h3>
+            <p class="card-text" style="margin:2px 0 0;">${b.email} · pediu ${b.data} às ${b.hora}</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-primary btn-sm admin-booking-confirm">Confirmar</button>
+            <button type="button" class="btn btn-outline btn-sm admin-booking-reject">Recusar</button>
+          </div>
+        </div>
+        <span class="admin-booking-status" style="font-size:12.5px;color:var(--muted);"></span>
+      `;
+      const status = card.querySelector('.admin-booking-status');
+      card.querySelector('.admin-booking-confirm').addEventListener('click', async (e)=>{
+        e.target.disabled = true;
+        const r = await apiPost('adminConfirmBooking', { idToken: patientIdToken, email: b.email, iso: b.iso });
+        if(r.ok){ card.remove(); } else { status.textContent = r.error || 'Erro ao confirmar.'; e.target.disabled = false; }
+      });
+      card.querySelector('.admin-booking-reject').addEventListener('click', async (e)=>{
+        e.target.disabled = true;
+        const r = await apiPost('adminRejectBooking', { idToken: patientIdToken, email: b.email, iso: b.iso });
+        if(r.ok){ card.remove(); } else { status.textContent = r.error || 'Erro ao recusar.'; e.target.disabled = false; }
+      });
+      wrap.appendChild(card);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
+
   async function loadAdminPatients(){
     const wrap = document.getElementById('admin-patients-list');
     if(!apiConfigured() || !patientIdToken){

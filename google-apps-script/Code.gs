@@ -112,6 +112,9 @@ function doPost(e) {
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
+    if (action === 'adminListPendingBookings') return jsonResponse(actionAdminListPendingBookings(body));
+    if (action === 'adminConfirmBooking') return jsonResponse(actionAdminConfirmBooking(body));
+    if (action === 'adminRejectBooking') return jsonResponse(actionAdminRejectBooking(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -185,6 +188,12 @@ function actionDashboard(email) {
   const pontosTotal = Number(p.PontosTotal) || 0;
   const totalInteracoes = sheetToObjects(getSheet('PontosLog')).filter(l => normEmail(l.Email) === normEmail(email)).length;
 
+  // próxima solicitação/consulta desta paciente (a mais próxima no futuro)
+  const meusAgendamentos = sheetToObjects(getSheet('Agendamentos'))
+    .filter(a => normEmail(a.Email) === normEmail(email) && a.IsoInicio && new Date(a.IsoInicio) > new Date())
+    .sort((a, b) => new Date(a.IsoInicio) - new Date(b.IsoInicio));
+  const proximoAgendamento = meusAgendamentos[0] || null;
+
   return {
     ok: true,
     nome: p.Nome,
@@ -196,6 +205,9 @@ function actionDashboard(email) {
     proximoRetornoHora: p.ProximoRetornoHora || '',
     planoTexto: p.PlanoTexto || '',
     planoPdfUrl: p.PlanoPdfUrl || '',
+    agendamentoStatus: proximoAgendamento ? String(proximoAgendamento.Status).trim().toLowerCase() : null,
+    agendamentoData: proximoAgendamento ? proximoAgendamento.Data : '',
+    agendamentoHora: proximoAgendamento ? proximoAgendamento.Hora : '',
     pontosTotal: pontosTotal,
     totalInteracoes: totalInteracoes,
     creditoDisponivel: Math.floor(pontosTotal / 100) * 10,
@@ -361,40 +373,191 @@ function addPoints(email, tipo, pontos) {
   }
 }
 
-// ── AGENDA ───────────────────────────────────────────────
+// ── AGENDA (conectada de verdade ao Google Agenda da Regiane) ────
+//
+// A Regiane precisa compartilhar o Google Agenda dela com a conta que
+// publica o backend (quem "Executa como" no deploy — veja o topo do
+// arquivo), com permissão de "Fazer alterações em eventos". Sem isso,
+// esta seção não consegue ler os horários livres nem criar a consulta.
 
-function actionSlots() {
-  const all = sheetToObjects(getSheet('Horarios'));
-  const livres = all.filter(h => String(h.Disponivel).trim().toLowerCase() === 'sim');
-  return {
-    ok: true,
-    slots: livres.map(h => ({ data: h.Data, hora: h.Hora }))
-  };
+const REGIANE_CALENDAR_ID = REGIANE_NOTIFICATION_EMAIL; // e-mail do Google Agenda da Regiane
+const AGENDA_DIAS_A_FRENTE = 14;   // até quantos dias no futuro mostrar horários
+const AGENDA_HORA_INICIO = 9;      // agenda abre às 09:00
+const AGENDA_HORA_FIM = 18;        // último horário considerado antes das 18:00
+const AGENDA_DURACAO_MIN = 60;     // duração de cada consulta, em minutos
+const FUSO_AGENDA = 'GMT-3';       // horário de Brasília
+
+function getRegianeCalendar() {
+  const cal = CalendarApp.getCalendarById(REGIANE_CALENDAR_ID);
+  if (!cal) {
+    throw new Error('Não foi possível acessar o Google Agenda da Regiane. Ela precisa compartilhar a agenda (com permissão de fazer alterações) com quem publicou o site.');
+  }
+  return cal;
 }
 
-function actionBookSlot(body) {
-  const email = normEmail(body.email);
-  const p = findPatientRow(email);
-  if (!p) return { ok: false, error: 'Paciente não encontrada.' };
-  if (!body.data || !body.hora) return { ok: false, error: 'Selecione data e hora.' };
+/**
+ * Gera os horários livres olhando de verdade o Google Agenda da Regiane:
+ * dias úteis, dentro do horário comercial configurado acima, excluindo
+ * qualquer horário que já tenha um evento (compromisso) na agenda dela.
+ */
+function actionSlots() {
+  const cal = getRegianeCalendar();
+  const agora = new Date();
+  const fim = new Date();
+  fim.setDate(fim.getDate() + AGENDA_DIAS_A_FRENTE);
+  const eventos = cal.getEvents(agora, fim);
 
-  getSheet('Agendamentos').appendRow([email, body.data, body.hora, 'solicitado', new Date()]);
+  const slots = [];
+  for (let d = 0; d < AGENDA_DIAS_A_FRENTE; d++) {
+    const dia = new Date();
+    dia.setDate(dia.getDate() + d);
+    const diaSemana = dia.getDay();
+    if (diaSemana === 0 || diaSemana === 6) continue; // pula sábado e domingo
 
-  // marca o horário como indisponível
-  const hSheet = getSheet('Horarios');
-  const data = hSheet.getDataRange().getValues();
-  const headers = data[0];
-  const dataCol = headers.indexOf('Data');
-  const horaCol = headers.indexOf('Hora');
-  const dispCol = headers.indexOf('Disponivel');
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][dataCol]) === String(body.data) && String(data[i][horaCol]) === String(body.hora)) {
-      hSheet.getRange(i + 1, dispCol + 1).setValue('Não');
-      break;
+    for (let h = AGENDA_HORA_INICIO; h < AGENDA_HORA_FIM; h++) {
+      const inicio = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h, 0, 0);
+      if (inicio <= agora) continue;
+      const termino = new Date(inicio.getTime() + AGENDA_DURACAO_MIN * 60000);
+
+      const ocupado = eventos.some(ev => ev.getStartTime() < termino && ev.getEndTime() > inicio);
+      if (!ocupado) {
+        slots.push({
+          data: Utilities.formatDate(inicio, FUSO_AGENDA, 'dd/MM/yyyy'),
+          hora: Utilities.formatDate(inicio, FUSO_AGENDA, 'HH:mm'),
+          iso: inicio.toISOString()
+        });
+      }
     }
   }
 
+  return { ok: true, slots: slots };
+}
+
+// Cores de destaque na aba Agendamentos, pra Regiane bater o olho e ver
+// na hora quem está pedindo horário e quem já foi confirmado.
+const COR_SOLICITADO = '#FFF3CD';
+const COR_CONFIRMADO = '#D4EDDA';
+
+/**
+ * A paciente SOLICITA um horário — isso não cria o evento na agenda
+ * ainda. Fica marcado como "solicitado" (destacado em amarelo na aba
+ * Agendamentos) e a Regiane recebe um aviso por e-mail. Só quando ela
+ * confirma pelo Painel (actionAdminConfirmBooking) é que o evento entra
+ * de verdade no Google Agenda dela.
+ */
+function actionBookSlot(body) {
+  const email = normEmail(body.email);
+  let nome;
+  const p = findPatientRow(email);
+  if (p) {
+    nome = p.Nome;
+  } else if (isAdmin(email)) {
+    nome = 'Administradora (teste)';
+  } else {
+    return { ok: false, error: 'Paciente não encontrada.' };
+  }
+  if (!body.iso) return { ok: false, error: 'Selecione um horário da lista.' };
+
+  const inicio = new Date(body.iso);
+  if (isNaN(inicio.getTime())) return { ok: false, error: 'Horário inválido.' };
+  const termino = new Date(inicio.getTime() + AGENDA_DURACAO_MIN * 60000);
+
+  const cal = getRegianeCalendar();
+  const jaOcupado = cal.getEvents(inicio, termino).length > 0;
+  if (jaOcupado) return { ok: false, error: 'Esse horário acabou de ser ocupado. Escolha outro.' };
+
+  const sheet = getSheet('Agendamentos');
+  const linha = [email, Utilities.formatDate(inicio, FUSO_AGENDA, 'dd/MM/yyyy'), Utilities.formatDate(inicio, FUSO_AGENDA, 'HH:mm'), 'solicitado', new Date(), nome, inicio.toISOString()];
+  sheet.appendRow(linha);
+  sheet.getRange(sheet.getLastRow(), 1, 1, linha.length).setBackground(COR_SOLICITADO);
+
+  notifyRegiane(
+    'Nova solicitação de agendamento — ' + nome,
+    nome + ' (' + email + ') pediu consulta para ' + Utilities.formatDate(inicio, FUSO_AGENDA, 'dd/MM/yyyy \'às\' HH:mm') + '. Entre no Painel da Regiane no site (ou na aba Agendamentos da planilha) pra confirmar ou não.'
+  );
+
   return { ok: true };
+}
+
+/**
+ * Lista as solicitações de agendamento ainda pendentes, pro "Painel da
+ * Regiane" mostrar em destaque — ela confirma ou recusa por lá.
+ */
+function actionAdminListPendingBookings(body) {
+  assertAdmin(body.idToken);
+  const pendentes = sheetToObjects(getSheet('Agendamentos')).filter(a => String(a.Status).trim().toLowerCase() === 'solicitado');
+  return {
+    ok: true,
+    pendentes: pendentes.map(a => ({
+      email: a.Email, nome: a.Nome || a.Email, data: a.Data, hora: a.Hora, iso: a.IsoInicio
+    }))
+  };
+}
+
+/**
+ * A Regiane confirma uma solicitação — só agora o evento é criado de
+ * verdade no Google Agenda dela (com a paciente como convidada), e a
+ * linha na aba Agendamentos vira "confirmado" (destaque verde).
+ */
+function actionAdminConfirmBooking(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const iso = body.iso;
+  const sheet = getSheet('Agendamentos');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const statusCol = headers.indexOf('Status');
+  const isoCol = headers.indexOf('IsoInicio');
+  const nomeCol = headers.indexOf('Nome');
+
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email && String(data[i][isoCol]) === String(iso) && String(data[i][statusCol]).trim().toLowerCase() === 'solicitado') {
+      const inicio = new Date(iso);
+      const termino = new Date(inicio.getTime() + AGENDA_DURACAO_MIN * 60000);
+      const cal = getRegianeCalendar();
+      if (cal.getEvents(inicio, termino).length > 0) {
+        return { ok: false, error: 'Esse horário já está ocupado na sua agenda — não dá pra confirmar.' };
+      }
+
+      const nome = data[i][nomeCol] || email;
+      cal.createEvent('Consulta - ' + nome, inicio, termino, {
+        guests: email,
+        description: 'Agendado pelo site. Paciente: ' + nome + ' (' + email + ')'
+      });
+
+      sheet.getRange(i + 1, statusCol + 1).setValue('confirmado');
+      sheet.getRange(i + 1, 1, 1, headers.length).setBackground(COR_CONFIRMADO);
+
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Solicitação não encontrada (talvez já tenha sido confirmada).' };
+}
+
+/**
+ * A Regiane recusa uma solicitação — some da lista de pendentes, sem
+ * criar nada na agenda. A paciente pode tentar outro horário.
+ */
+function actionAdminRejectBooking(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const iso = body.iso;
+  const sheet = getSheet('Agendamentos');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const statusCol = headers.indexOf('Status');
+  const isoCol = headers.indexOf('IsoInicio');
+
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email && String(data[i][isoCol]) === String(iso) && String(data[i][statusCol]).trim().toLowerCase() === 'solicitado') {
+      sheet.getRange(i + 1, statusCol + 1).setValue('recusado');
+      sheet.getRange(i + 1, 1, 1, headers.length).setBackground(null);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Solicitação não encontrada.' };
 }
 
 // ── CHECK-UP (acesso único por e-mail, liberado via pagamento) ──────
@@ -570,7 +733,7 @@ function setupSheetStructure() {
 
   buildSheet('Horarios', ['Data', 'Hora', 'Disponivel'], ['28/07/2026', '15h00', 'Sim']);
 
-  buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao'], null);
+  buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao', 'Nome', 'IsoInicio'], null);
 
   buildSheet('CheckupPacientes',
     ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'RespostasChecklist', 'RespostasQuiz', 'DataCheckup'],
