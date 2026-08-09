@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /membros/
+
+Sitemap: https://regianemariasilva22-sudo.github.io/site-regiane-silva/sitemap.xml
