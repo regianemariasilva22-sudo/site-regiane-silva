@@ -13,29 +13,37 @@ function apiConfigured() {
   return typeof API_URL === 'string' && API_URL.indexOf('COLE_AQUI') === -1;
 }
 
+function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
 async function apiGet(action, params) {
   params = params || {};
   if (!apiConfigured()) return { ok: false, error: 'API ainda não configurada.' };
   const qs = new URLSearchParams(Object.assign({ action: action }, params)).toString();
-  try {
-    const res = await fetch(API_URL + '?' + qs);
-    return await res.json();
-  } catch (err) {
-    return { ok: false, error: 'Não foi possível conectar ao servidor. Tente novamente em instantes.' };
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    try {
+      const res = await fetch(API_URL + '?' + qs);
+      return await res.json();
+    } catch (err) {
+      if (tentativa === 2) return { ok: false, error: 'Não foi possível conectar ao servidor. Tente novamente em instantes.' };
+      await wait(800);
+    }
   }
 }
 
 async function apiPost(action, data) {
   data = data || {};
   if (!apiConfigured()) return { ok: false, error: 'API ainda não configurada.' };
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({ action: action }, data))
-    });
-    return await res.json();
-  } catch (err) {
-    return { ok: false, error: 'Não foi possível conectar ao servidor. Tente novamente em instantes.' };
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action: action }, data))
+      });
+      return await res.json();
+    } catch (err) {
+      if (tentativa === 2) return { ok: false, error: 'Não foi possível conectar ao servidor. Tente novamente em instantes.' };
+      await wait(800);
+    }
   }
 }
