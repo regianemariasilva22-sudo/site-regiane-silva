@@ -285,7 +285,17 @@
             <div><div class="mli-title">Ajudar ou responder outra paciente</div><div class="mli-sub">+3 pontos por interação</div></div>
           </div>
           <p style="font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.6;">✦ Vale foto do seu corpo, do seu prato ou interação real na comunidade — não conta upload de qualquer imagem. A cada <strong>100 pontos</strong>, você ganha <strong>R$10</strong> de crédito, automaticamente.</p>
-          <button type="button" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-top:20px;" onclick="alert('O envio de fotos direto por aqui ainda está em desenvolvimento. Por enquanto, envie sua foto pelo WhatsApp da Regiane.')">Enviar nova foto de resultado &nbsp;→</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
+            <div style="flex:1;min-width:180px;">
+              <input type="file" accept="image/*" id="foto-resultado-input" style="display:none;" />
+              <button type="button" class="btn btn-primary btn-sm" id="foto-resultado-btn" style="width:100%;justify-content:center;">Enviar foto de resultado &nbsp;→</button>
+            </div>
+            <div style="flex:1;min-width:180px;">
+              <input type="file" accept="image/*" id="foto-prato-input" style="display:none;" />
+              <button type="button" class="btn btn-outline btn-sm" id="foto-prato-btn" style="width:100%;justify-content:center;">Enviar foto do prato &nbsp;→</button>
+            </div>
+          </div>
+          <span id="foto-upload-status" style="display:block;margin-top:10px;font-size:12.5px;color:var(--muted);"></span>
         </div>
         <div class="mem-panel reveal in d1">
           <h3>Meta do próximo crédito</h3>
@@ -789,6 +799,38 @@
       }
     });
   });
+
+  /* ── PONTOS: envio real de foto (resultado ou prato) ── */
+  function wireFotoUpload(btnId, inputId, tipo){
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if(!btn || !input) return;
+    btn.addEventListener('click', ()=> input.click());
+    input.addEventListener('change', async ()=>{
+      const file = input.files[0];
+      if(!file) return;
+      if(!patientEmail){ alert('Faça login novamente para enviar sua foto.'); return; }
+      const status = document.getElementById('foto-upload-status');
+      btn.disabled = true;
+      status.textContent = 'Enviando...';
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        const r = await apiPost('uploadFoto', { email: patientEmail, tipo: tipo, fileBase64: base64, fileName: file.name, mimeType: file.type });
+        btn.disabled = false;
+        input.value = '';
+        if(r.ok){
+          status.textContent = 'Foto enviada — +5 pontos ✓';
+          loadDashboardData();
+        } else {
+          status.textContent = r.error || 'Não foi possível enviar a foto.';
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  wireFotoUpload('foto-resultado-btn', 'foto-resultado-input', 'resultado');
+  wireFotoUpload('foto-prato-btn', 'foto-prato-input', 'prato');
 
   /* ── PAINEL DA REGIANE (admin) ── */
   async function loadAdminBookings(){

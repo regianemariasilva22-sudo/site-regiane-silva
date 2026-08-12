@@ -111,6 +111,7 @@ function doPost(e) {
     if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
     if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
+    if (action === 'uploadFoto') return jsonResponse(actionUploadFoto(body));
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
@@ -255,6 +256,34 @@ function actionSaveRecipe(body) {
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+/**
+ * A paciente envia uma foto de resultado ou do prato — vai pro Google Drive
+ * da Regiane e conta pontos automaticamente (5 pontos), sem ela precisar
+ * mexer em nada. A Regiane recebe um aviso por e-mail com o link da foto.
+ */
+function actionUploadFoto(body) {
+  const email = normEmail(body.email);
+  const p = findPatientRow(email);
+  if (!p) return { ok: false, error: 'Paciente não encontrada.' };
+  if (!body.fileBase64) return { ok: false, error: 'Nenhuma foto enviada.' };
+
+  const bytes = Utilities.base64Decode(body.fileBase64);
+  const blob = Utilities.newBlob(bytes, body.mimeType || 'image/jpeg', body.fileName || 'foto.jpg');
+  const file = DriveApp.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const url = file.getUrl();
+
+  const tipo = body.tipo === 'prato' ? 'Foto do prato' : 'Foto de resultado';
+  addPoints(email, tipo, 5);
+
+  notifyRegiane(
+    'Nova ' + tipo.toLowerCase() + ' — ' + (p.Nome || email),
+    (p.Nome || email) + ' enviou uma ' + tipo.toLowerCase() + '.\n' + url
+  );
+
+  return { ok: true, url: url };
 }
 
 /**
