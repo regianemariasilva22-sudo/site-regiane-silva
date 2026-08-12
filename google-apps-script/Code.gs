@@ -259,9 +259,10 @@ function actionSaveRecipe(body) {
 }
 
 /**
- * A paciente envia uma foto de resultado ou do prato — vai pro Google Drive
- * da Regiane e conta pontos automaticamente (5 pontos), sem ela precisar
- * mexer em nada. A Regiane recebe um aviso por e-mail com o link da foto.
+ * A paciente envia uma foto de resultado ou do prato — vai direto por e-mail
+ * pra Regiane (anexada) e conta pontos automaticamente (5 pontos), sem ela
+ * precisar mexer em nada. Usa MailApp em vez de Drive de propósito: evita
+ * depender da autorização de Drive, que trava a implantação existente.
  */
 function actionUploadFoto(body) {
   const email = normEmail(body.email);
@@ -271,19 +272,24 @@ function actionUploadFoto(body) {
 
   const bytes = Utilities.base64Decode(body.fileBase64);
   const blob = Utilities.newBlob(bytes, body.mimeType || 'image/jpeg', body.fileName || 'foto.jpg');
-  const file = DriveApp.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const url = file.getUrl();
 
   const tipo = body.tipo === 'prato' ? 'Foto do prato' : 'Foto de resultado';
   addPoints(email, tipo, 5);
 
-  notifyRegiane(
-    'Nova ' + tipo.toLowerCase() + ' — ' + (p.Nome || email),
-    (p.Nome || email) + ' enviou uma ' + tipo.toLowerCase() + '.\n' + url
-  );
+  if (REGIANE_NOTIFICATION_EMAIL && REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') === -1) {
+    try {
+      MailApp.sendEmail({
+        to: REGIANE_NOTIFICATION_EMAIL,
+        subject: 'Nova ' + tipo.toLowerCase() + ' — ' + (p.Nome || email),
+        body: (p.Nome || email) + ' (' + email + ') enviou uma ' + tipo.toLowerCase() + '. Confira em anexo.',
+        attachments: [blob]
+      });
+    } catch (err) {
+      // não deixa o fluxo principal quebrar se o e-mail falhar
+    }
+  }
 
-  return { ok: true, url: url };
+  return { ok: true };
 }
 
 /**
