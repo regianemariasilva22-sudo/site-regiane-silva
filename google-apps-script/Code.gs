@@ -218,7 +218,7 @@ function actionDashboard(email) {
     creditoDisponivel: Math.floor(pontosTotal / 100) * 10,
     faltamParaProximoCredito: 100 - (pontosTotal % 100),
     materiais: materiais.map(m => ({
-      tipo: m.Tipo, titulo: m.Titulo, descricao: m.Descricao, link: m.Link
+      tipo: m.Tipo, titulo: m.Titulo, descricao: m.Descricao, link: m.Link, area: m.Area || 'materiais'
     }))
   };
 }
@@ -362,10 +362,14 @@ function actionAdminAddMaterial(body) {
   const titulo = String(body.titulo || '').trim();
   if (!link || !titulo) return { ok: false, error: 'Preencha pelo menos o título e o link.' };
 
+  const areasValidas = ['aulas', 'rotulo', 'materiais'];
+  const area = areasValidas.indexOf(body.area) !== -1 ? body.area : 'materiais';
+  const tipoPadrao = area === 'materiais' ? 'Material' : 'Vídeo';
+
   const destino = normEmail(body.email) || 'todos';
   const sheet = getSheet('Materiais');
   const id = new Date().getTime();
-  sheet.appendRow([id, destino === 'todos' ? 'TODOS' : destino, body.tipo || 'Vídeo', titulo, body.descricao || '', link]);
+  sheet.appendRow([id, destino === 'todos' ? 'TODOS' : destino, body.tipo || tipoPadrao, titulo, body.descricao || '', link, area]);
 
   return { ok: true };
 }
@@ -877,8 +881,8 @@ function setupSheetStructure() {
     ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '', '']);
 
   buildSheet('Materiais',
-    ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link'],
-    [1, 'TODOS', 'PDF', 'Planner alimentar semanal', 'Vale para todas as pacientes do Programa', 'https://']);
+    ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'],
+    [1, 'TODOS', 'PDF', 'Planner alimentar semanal', 'Vale para todas as pacientes do Programa', 'https://', 'materiais']);
 
   buildSheet('Comentarios', ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora'], null);
 

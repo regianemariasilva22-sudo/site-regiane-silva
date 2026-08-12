@@ -178,7 +178,7 @@
         <button class="video-filter">Lives gravadas</button>
       </div>
 
-      <div class="video-grid">
+      <div class="video-grid" id="video-grid-aulas">
         <div class="video-card">
           <div class="video-thumb">
             <span class="video-new">Novo</span>
@@ -304,6 +304,10 @@
         <div class="glass-card"><span class="card-num">02</span><div class="card-title">Açúcares escondidos</div><p class="card-text">Os nomes que o açúcar usa pra se disfarçar no rótulo.</p></div>
         <div class="glass-card"><span class="card-num">03</span><div class="card-title">Vale a pena ou não?</div><p class="card-text">Análises de produtos que eu encontro no mercado, direto pra você.</p></div>
       </div>
+
+      <h3 id="rotulo-videos-title" style="margin-top:34px;margin-bottom:16px;display:none;">Vídeos de análise de rótulo</h3>
+      <div class="video-grid" id="video-grid-rotulo"></div>
+
       <div class="upload-hint">✦ Toda vez que eu analiso um rótulo no mercado, publico aqui pra vocês.</div>
     </div>
 
@@ -443,10 +447,16 @@
 
       <h3 style="margin-bottom:14px;">Adicionar vídeo ou material</h3>
       <div class="mem-panel" style="margin-bottom:36px;">
-        <p class="card-text" style="margin-bottom:14px;">Cole o link do vídeo (YouTube, Drive etc.) e escolha quem vai ver — aparece na aba "Receitas &amp; Materiais" da paciente na hora.</p>
+        <p class="card-text" style="margin-bottom:14px;">Escolha em qual aba vai aparecer, cole o link (vídeo do YouTube toca direto aqui na plataforma — não manda a paciente pro YouTube) e escolha quem vai ver.</p>
         <div style="display:grid;gap:10px;">
-          <input type="text" id="mat-titulo" placeholder="Título (ex: Vídeo — Como montar seu prato)" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
-          <input type="text" id="mat-link" placeholder="Link do vídeo" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
+          <select id="mat-area" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">
+            <option value="aulas">Aulas &amp; Vídeos (aula em vídeo pra pacientes)</option>
+            <option value="rotulo">Raio-X do Rótulo (vídeo analisando rótulo)</option>
+            <option value="materiais">Receitas &amp; Materiais (PDF ou link de material)</option>
+          </select>
+          <input type="text" id="mat-titulo" placeholder="Título (ex: Como interpretar os sinais do seu metabolismo)" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
+          <input type="text" id="mat-categoria" placeholder="Categoria (opcional — ex: Intestino, PDF, Vídeo)" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
+          <input type="text" id="mat-link" placeholder="Link (YouTube, Google Drive etc.)" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
           <textarea id="mat-descricao" placeholder="Descrição (opcional)" style="width:100%;min-height:60px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;"></textarea>
           <select id="mat-destino" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">
             <option value="todos">Todas as pacientes</option>
@@ -462,6 +472,16 @@
       <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
     </div>
   </main>
+</div>
+
+<div class="video-modal-overlay" id="video-modal" style="display:none;">
+  <div class="video-modal-box">
+    <button type="button" class="video-modal-close" id="video-modal-close">✕</button>
+    <div class="video-modal-frame">
+      <iframe id="video-modal-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    <div class="video-modal-title" id="video-modal-title"></div>
+  </div>
 </div>
 
 <script src="../../assets/js/api.js"></script>
@@ -577,25 +597,91 @@
     }
 
     if(d.materiais && d.materiais.length){
-      const wrap = document.getElementById('materiais-pessoais');
-      document.getElementById('materiais-pessoais-title').style.display = 'block';
-      d.materiais.forEach(m=>{
-        const card = document.createElement('div');
-        card.className = 'glass-card';
-        card.innerHTML = `<span class="card-num"></span><div class="card-title"></div><p class="card-text"></p>`;
-        card.querySelector('.card-num').textContent = m.tipo || 'Material';
-        card.querySelector('.card-title').textContent = m.titulo || '';
-        card.querySelector('.card-text').textContent = m.descricao || '';
-        if(m.link){
-          card.style.cursor = 'none';
-          card.addEventListener('click', ()=>window.open(m.link, '_blank'));
-        }
-        wrap.appendChild(card);
-      });
+      const materiaisGerais = d.materiais.filter(m => (m.area || 'materiais') === 'materiais');
+      const aulasVideos = d.materiais.filter(m => m.area === 'aulas');
+      const rotuloVideos = d.materiais.filter(m => m.area === 'rotulo');
+
+      if(materiaisGerais.length){
+        const wrap = document.getElementById('materiais-pessoais');
+        document.getElementById('materiais-pessoais-title').style.display = 'block';
+        materiaisGerais.forEach(m=>{
+          const card = document.createElement('div');
+          card.className = 'glass-card';
+          card.innerHTML = `<span class="card-num"></span><div class="card-title"></div><p class="card-text"></p>`;
+          card.querySelector('.card-num').textContent = m.tipo || 'Material';
+          card.querySelector('.card-title').textContent = m.titulo || '';
+          card.querySelector('.card-text').textContent = m.descricao || '';
+          if(m.link){
+            card.style.cursor = 'none';
+            card.addEventListener('click', ()=>window.open(m.link, '_blank'));
+          }
+          wrap.appendChild(card);
+        });
+      }
+
+      if(aulasVideos.length){
+        const grid = document.getElementById('video-grid-aulas');
+        aulasVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
+      }
+
+      if(rotuloVideos.length){
+        document.getElementById('rotulo-videos-title').style.display = 'block';
+        const grid = document.getElementById('video-grid-rotulo');
+        rotuloVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
+      }
+
       if(window.__rebindCursor) window.__rebindCursor();
     }
   }
   loadDashboardData();
+
+  /* ── VÍDEOS: card + player embutido na plataforma (não abre o YouTube) ── */
+  function buildVideoCard(m){
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.innerHTML = `
+      <div class="video-thumb">
+        <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+      </div>
+      <div class="video-body">
+        <div class="video-cat"></div>
+        <div class="video-title"></div>
+      </div>
+    `;
+    card.querySelector('.video-cat').textContent = m.tipo || 'Vídeo';
+    card.querySelector('.video-title').textContent = m.titulo || '';
+    card.style.cursor = 'none';
+    card.addEventListener('click', ()=> openVideoModal(m.link, m.titulo));
+    return card;
+  }
+
+  function toEmbedUrl(link){
+    if(!link) return null;
+    let m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+    if(m) return 'https://www.youtube.com/embed/' + m[1];
+    m = link.match(/vimeo\.com\/(\d+)/);
+    if(m) return 'https://player.vimeo.com/video/' + m[1];
+    m = link.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if(m) return 'https://drive.google.com/file/d/' + m[1] + '/preview';
+    return null;
+  }
+
+  function openVideoModal(link, titulo){
+    const embed = toEmbedUrl(link);
+    if(!embed){ window.open(link, '_blank'); return; }
+    document.getElementById('video-modal-iframe').src = embed;
+    document.getElementById('video-modal-title').textContent = titulo || '';
+    document.getElementById('video-modal').style.display = 'flex';
+  }
+
+  function closeVideoModal(){
+    document.getElementById('video-modal').style.display = 'none';
+    document.getElementById('video-modal-iframe').src = '';
+  }
+  document.getElementById('video-modal-close').addEventListener('click', closeVideoModal);
+  document.getElementById('video-modal').addEventListener('click', (e)=>{
+    if(e.target.id === 'video-modal') closeVideoModal();
+  });
 
   /* ── COMUNIDADE: comentários reais via API (com fallback local de demonstração) ── */
   async function loadComments(){
@@ -853,7 +939,9 @@
   const matAddBtn = document.getElementById('mat-add-btn');
   if(matAddBtn){
     matAddBtn.addEventListener('click', async ()=>{
+      const area = document.getElementById('mat-area').value;
       const titulo = document.getElementById('mat-titulo').value.trim();
+      const categoria = document.getElementById('mat-categoria').value.trim();
       const link = document.getElementById('mat-link').value.trim();
       const descricao = document.getElementById('mat-descricao').value.trim();
       const destino = document.getElementById('mat-destino').value;
@@ -861,11 +949,12 @@
       if(!titulo || !link){ status.textContent = 'Preencha o título e o link.'; return; }
       matAddBtn.disabled = true;
       status.textContent = 'Adicionando...';
-      const r = await apiPost('adminAddMaterial', { idToken: patientIdToken, titulo, link, descricao, tipo: 'Vídeo', email: destino });
+      const r = await apiPost('adminAddMaterial', { idToken: patientIdToken, titulo, link, descricao, tipo: categoria, area, email: destino });
       matAddBtn.disabled = false;
       if(r.ok){
         status.textContent = 'Adicionado ✓';
         document.getElementById('mat-titulo').value = '';
+        document.getElementById('mat-categoria').value = '';
         document.getElementById('mat-link').value = '';
         document.getElementById('mat-descricao').value = '';
       } else {
