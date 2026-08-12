@@ -770,28 +770,32 @@ function actionAdminListCheckupPatients(body) {
 // ── LINK NA BIO (biolink.html) ───────────────────────────
 
 /**
- * Recebe os leads do quiz de diagnóstico e da newsletter do link na bio,
- * salva numa aba própria da planilha e avisa a Regiane por e-mail.
+ * Recebe os leads do link na bio e separa em duas abas: quem respondeu o
+ * quiz de diagnóstico vai para BioLeadsQuiz, quem só deixou o e-mail na
+ * newsletter vai para BioNewsletter. Nos dois casos avisa a Regiane.
  */
 function actionBioLead(body) {
-  const sheet = getSheet('BioLeads');
+  if (body.tag === 'newsletter') {
+    const sheet = getSheet('BioNewsletter');
+    sheet.appendRow([new Date(), body.email || '']);
+    notifyRegiane('Novo inscrito na newsletter do link na bio', 'E-mail: ' + (body.email || '-'));
+    return { ok: true };
+  }
+
+  const sheet = getSheet('BioLeadsQuiz');
   sheet.appendRow([
     new Date(),
     body.nome || '',
-    body.email || '',
     body.telefone || '',
-    body.tag || '',
     body.pergunta1 || '',
     body.pergunta2 || '',
     body.textoLivre || '',
     body.cursoSugerido || ''
   ]);
 
-  const quem = body.nome || body.email || body.telefone || 'alguém';
-  let corpo = 'Novo lead pelo link na bio.\n\nNome: ' + (body.nome || '-') +
-    '\nE-mail: ' + (body.email || '-') +
-    '\nTelefone: ' + (body.telefone || '-') +
-    '\nOrigem: ' + (body.tag || '-');
+  const quem = body.nome || body.telefone || 'alguém';
+  let corpo = 'Novo diagnóstico respondido no link na bio.\n\nNome: ' + (body.nome || '-') +
+    '\nTelefone: ' + (body.telefone || '-');
   if (body.pergunta1) corpo += '\nMomento: ' + body.pergunta1;
   if (body.pergunta2) corpo += '\nSintoma: ' + body.pergunta2;
   if (body.textoLivre) corpo += '\nMensagem: ' + body.textoLivre;
@@ -865,8 +869,12 @@ function setupSheetStructure() {
     ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'RespostasChecklist', 'RespostasQuiz', 'DataCheckup'],
     ['exemplo@checkup.com', 'Nome de Exemplo', new Date(), 'Sim', 'Não', '', '', '']);
 
-  buildSheet('BioLeads',
-    ['Data', 'Nome', 'Email', 'Telefone', 'Origem', 'Momento', 'Sintoma', 'Mensagem', 'RecomendacaoSugerida'],
+  buildSheet('BioLeadsQuiz',
+    ['Data', 'Nome', 'Telefone', 'Momento', 'Sintoma', 'Mensagem', 'RecomendacaoSugerida'],
+    null);
+
+  buildSheet('BioNewsletter',
+    ['Data', 'Email'],
     null);
 
   // remove a aba padrão em branco, se existir e não for a única
@@ -876,7 +884,7 @@ function setupSheetStructure() {
   });
 
   // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
-  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog', 'BioLeads'];
+  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog', 'BioLeadsQuiz', 'BioNewsletter'];
   ordem.forEach((nome, i) => {
     const s = ss.getSheetByName(nome);
     if (s) ss.setActiveSheet(s);
