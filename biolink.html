@@ -961,6 +961,7 @@ footer{padding:32px 24px 52px;text-align:center;}
     <div class="nl-title">Receba dicas de nutrição funcional</div>
     <div class="nl-sub">Conteúdos sobre investigação de sintomas, intestino e metabolismo direto no seu e-mail — sem enrolação.</div>
     <form class="nl-form" onsubmit="doNl(event)">
+      <input type="text" class="nl-input" id="nlN" placeholder="Seu nome" required/>
       <input type="email" class="nl-input" id="nlE" placeholder="Seu melhor e-mail" required/>
       <button type="submit" class="btn-cta">Quero receber</button>
     </form>
@@ -1146,9 +1147,11 @@ function finish(){
 // ─── NEWSLETTER ──────────────────────────────────────────
 function doNl(e){
   e.preventDefault();
+  const nome=document.getElementById('nlN').value.trim();
   const email=document.getElementById('nlE').value.trim();
-  if(!email)return;
-  post({email,tag:'newsletter',nome:'',telefone:'',pergunta1:'',pergunta2:'',textoLivre:'',cursoSugerido:''});
+  if(!nome||!email)return;
+  post({email,nome,tag:'newsletter',telefone:'',pergunta1:'',pergunta2:'',textoLivre:'',cursoSugerido:''});
+  document.getElementById('nlN').style.display='none';
   document.getElementById('nlE').style.display='none';
   e.target.querySelector('.btn-cta').style.display='none';
   document.getElementById('nlOk').style.display='block';

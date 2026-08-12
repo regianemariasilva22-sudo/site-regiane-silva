@@ -441,6 +441,23 @@
       <h3 style="margin-bottom:14px;">Solicitações de agendamento</h3>
       <div id="admin-bookings-list" style="margin-bottom:36px;"><p class="card-text" style="color:var(--muted);">Carregando solicitações...</p></div>
 
+      <h3 style="margin-bottom:14px;">Adicionar vídeo ou material</h3>
+      <div class="mem-panel" style="margin-bottom:36px;">
+        <p class="card-text" style="margin-bottom:14px;">Cole o link do vídeo (YouTube, Drive etc.) e escolha quem vai ver — aparece na aba "Receitas &amp; Materiais" da paciente na hora.</p>
+        <div style="display:grid;gap:10px;">
+          <input type="text" id="mat-titulo" placeholder="Título (ex: Vídeo — Como montar seu prato)" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
+          <input type="text" id="mat-link" placeholder="Link do vídeo" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" />
+          <textarea id="mat-descricao" placeholder="Descrição (opcional)" style="width:100%;min-height:60px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;"></textarea>
+          <select id="mat-destino" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">
+            <option value="todos">Todas as pacientes</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="btn btn-primary btn-sm" id="mat-add-btn">Adicionar</button>
+          <span id="mat-add-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+      </div>
+
       <h3 style="margin-bottom:14px;">Pacientes</h3>
       <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
     </div>
@@ -754,6 +771,19 @@
       wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma paciente cadastrada ainda na aba Pacientes da planilha.</p>';
       return;
     }
+
+    const matDestino = document.getElementById('mat-destino');
+    if(matDestino){
+      matDestino.querySelectorAll('option[data-patient]').forEach(o=>o.remove());
+      res.pacientes.forEach(p=>{
+        const opt = document.createElement('option');
+        opt.value = p.email;
+        opt.dataset.patient = '1';
+        opt.textContent = p.nome || p.email;
+        matDestino.appendChild(opt);
+      });
+    }
+
     wrap.innerHTML = '';
     res.pacientes.forEach(p=>{
       const card = document.createElement('div');
@@ -818,6 +848,30 @@
       wrap.appendChild(card);
     });
     if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  const matAddBtn = document.getElementById('mat-add-btn');
+  if(matAddBtn){
+    matAddBtn.addEventListener('click', async ()=>{
+      const titulo = document.getElementById('mat-titulo').value.trim();
+      const link = document.getElementById('mat-link').value.trim();
+      const descricao = document.getElementById('mat-descricao').value.trim();
+      const destino = document.getElementById('mat-destino').value;
+      const status = document.getElementById('mat-add-status');
+      if(!titulo || !link){ status.textContent = 'Preencha o título e o link.'; return; }
+      matAddBtn.disabled = true;
+      status.textContent = 'Adicionando...';
+      const r = await apiPost('adminAddMaterial', { idToken: patientIdToken, titulo, link, descricao, tipo: 'Vídeo', email: destino });
+      matAddBtn.disabled = false;
+      if(r.ok){
+        status.textContent = 'Adicionado ✓';
+        document.getElementById('mat-titulo').value = '';
+        document.getElementById('mat-link').value = '';
+        document.getElementById('mat-descricao').value = '';
+      } else {
+        status.textContent = r.error || 'Erro ao adicionar.';
+      }
+    });
   }
 </script>
 </body>

@@ -114,6 +114,7 @@ function doPost(e) {
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
+    if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
     if (action === 'adminListPendingBookings') return jsonResponse(actionAdminListPendingBookings(body));
     if (action === 'adminConfirmBooking') return jsonResponse(actionAdminConfirmBooking(body));
     if (action === 'adminRejectBooking') return jsonResponse(actionAdminRejectBooking(body));
@@ -347,6 +348,26 @@ function actionAdminUploadPlanPdf(body) {
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+/**
+ * A administradora adiciona um material (vídeo, PDF, link etc.) direto pelo
+ * site — vira uma linha na aba Materiais. Se "email" vier vazio ou como
+ * "TODOS", o material aparece pra todas as pacientes do Programa; senão,
+ * só pra quem tem aquele e-mail cadastrado.
+ */
+function actionAdminAddMaterial(body) {
+  assertAdmin(body.idToken);
+  const link = String(body.link || '').trim();
+  const titulo = String(body.titulo || '').trim();
+  if (!link || !titulo) return { ok: false, error: 'Preencha pelo menos o título e o link.' };
+
+  const destino = normEmail(body.email) || 'todos';
+  const sheet = getSheet('Materiais');
+  const id = new Date().getTime();
+  sheet.appendRow([id, destino === 'todos' ? 'TODOS' : destino, body.tipo || 'Vídeo', titulo, body.descricao || '', link]);
+
+  return { ok: true };
 }
 
 // ── COMUNIDADE / COMENTÁRIOS ────────────────────────────
@@ -777,8 +798,8 @@ function actionAdminListCheckupPatients(body) {
 function actionBioLead(body) {
   if (body.tag === 'newsletter') {
     const sheet = getSheet('BioNewsletter');
-    sheet.appendRow([new Date(), body.email || '']);
-    notifyRegiane('Novo inscrito na newsletter do link na bio', 'E-mail: ' + (body.email || '-'));
+    sheet.appendRow([new Date(), body.nome || '', body.email || '']);
+    notifyRegiane('Novo inscrito na newsletter do link na bio', 'Nome: ' + (body.nome || '-') + '\nE-mail: ' + (body.email || '-'));
     return { ok: true };
   }
 
@@ -874,7 +895,7 @@ function setupSheetStructure() {
     null);
 
   buildSheet('BioNewsletter',
-    ['Data', 'Email'],
+    ['Data', 'Nome', 'Email'],
     null);
 
   // remove a aba padrão em branco, se existir e não for a única
