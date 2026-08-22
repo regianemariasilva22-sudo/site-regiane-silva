@@ -109,14 +109,13 @@
       <h1 class="mem-hello">Vídeos</h1>
       <p class="mem-sub">Sempre que eu tiver um vídeo novo ou uma atualização pra você, ele aparece aqui — começando por este, de boas-vindas.</p>
       <div class="video-grid" style="grid-template-columns:1fr;max-width:640px;">
-        <div class="video-card">
+        <div class="video-card" id="video-boas-vindas" style="cursor:none;">
           <div class="video-thumb" style="aspect-ratio:16/10;">
             <div class="video-play"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
-            <span class="video-duration">03:40</span>
           </div>
           <div class="video-body">
             <div class="video-cat">Regiane explica</div>
-            <div class="video-title">Como entender o resultado do seu Check-up Alimentar Funcional</div>
+            <div class="video-title">Boas-vindas ao Check-up Alimentar Funcional</div>
           </div>
         </div>
       </div>
@@ -368,6 +367,16 @@
       <div id="admin-checkup-list"><p class="card-text" style="color:var(--muted);">Carregando...</p></div>
     </div>
   </main>
+</div>
+
+<div class="video-modal-overlay" id="video-modal" style="display:none;">
+  <div class="video-modal-box">
+    <button type="button" class="video-modal-close" id="video-modal-close">✕</button>
+    <div class="video-modal-frame">
+      <iframe id="video-modal-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    <div class="video-modal-title" id="video-modal-title"></div>
+  </div>
 </div>
 
 <script src="../../assets/js/api.js"></script>
@@ -699,6 +708,37 @@
     });
     if(window.__rebindCursor) window.__rebindCursor();
   }
+
+  /* ── VÍDEO DE BOAS-VINDAS: toca embutido na plataforma, sem ir pro YouTube ── */
+  function toEmbedUrl(link){
+    if(!link) return null;
+    let m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+    if(m) return 'https://www.youtube.com/embed/' + m[1];
+    m = link.match(/vimeo\.com\/(\d+)/);
+    if(m) return 'https://player.vimeo.com/video/' + m[1];
+    return null;
+  }
+
+  function openVideoModal(link, titulo){
+    const embed = toEmbedUrl(link);
+    if(!embed){ window.open(link, '_blank'); return; }
+    document.getElementById('video-modal-iframe').src = embed;
+    document.getElementById('video-modal-title').textContent = titulo || '';
+    document.getElementById('video-modal').style.display = 'flex';
+  }
+
+  function closeVideoModal(){
+    document.getElementById('video-modal').style.display = 'none';
+    document.getElementById('video-modal-iframe').src = '';
+  }
+  document.getElementById('video-modal-close').addEventListener('click', closeVideoModal);
+  document.getElementById('video-modal').addEventListener('click', (e)=>{
+    if(e.target.id === 'video-modal') closeVideoModal();
+  });
+
+  document.getElementById('video-boas-vindas').addEventListener('click', ()=>{
+    openVideoModal('https://youtube.com/shorts/CE86c2NyIMg', 'Boas-vindas ao Check-up Alimentar Funcional');
+  });
 </script>
 </body>
 </html>
