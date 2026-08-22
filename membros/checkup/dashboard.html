@@ -376,6 +376,7 @@
       <iframe id="video-modal-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       <div class="yt-shield yt-shield-top" id="yt-shield-top"></div>
       <div class="yt-shield yt-shield-corner" id="yt-shield-corner"></div>
+      <div class="yt-shield yt-shield-bottomleft" id="yt-shield-bottomleft"></div>
     </div>
     <div class="video-modal-title" id="video-modal-title"></div>
   </div>
@@ -738,6 +739,7 @@
   }
   document.getElementById('yt-shield-top').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
   document.getElementById('yt-shield-corner').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
+  document.getElementById('yt-shield-bottomleft').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
 
   function openVideoModal(link, titulo){
     const embed = toEmbedUrl(link);
