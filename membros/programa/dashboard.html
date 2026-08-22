@@ -487,12 +487,15 @@
 <div class="video-modal-overlay" id="video-modal" style="display:none;">
   <div class="video-modal-box">
     <button type="button" class="video-modal-close" id="video-modal-close">✕</button>
-    <div class="video-modal-frame">
+    <div class="video-modal-frame" id="video-modal-frame">
       <iframe id="video-modal-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      <div class="yt-shield yt-shield-top" id="yt-shield-top"></div>
+      <div class="yt-shield yt-shield-corner" id="yt-shield-corner"></div>
     </div>
     <div class="video-modal-title" id="video-modal-title"></div>
   </div>
 </div>
+<div class="video-toast" id="video-toast">Este vídeo é exclusivo desta plataforma — assista por aqui 💛</div>
 
 <script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
@@ -646,11 +649,19 @@
   loadDashboardData();
 
   /* ── VÍDEOS: card + player embutido na plataforma (não abre o YouTube) ── */
+  function toThumbUrl(link){
+    if(!link) return null;
+    const m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+    return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : null;
+  }
+
   function buildVideoCard(m){
     const card = document.createElement('div');
     card.className = 'video-card';
+    const thumb = toThumbUrl(m.link);
+    const thumbStyle = thumb ? ` style="background-image:linear-gradient(180deg,rgba(59,32,36,0) 55%,rgba(59,32,36,.55) 100%), url('${thumb}');background-size:cover;background-position:center;"` : '';
     card.innerHTML = `
-      <div class="video-thumb">
+      <div class="video-thumb"${thumbStyle}>
         <div class="video-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
       </div>
       <div class="video-body">
@@ -668,19 +679,31 @@
   function toEmbedUrl(link){
     if(!link) return null;
     let m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
-    if(m) return 'https://www.youtube.com/embed/' + m[1];
+    if(m) return { url: 'https://www.youtube-nocookie.com/embed/' + m[1] + '?rel=0&modestbranding=1&iv_load_policy=3', isYoutube: true };
     m = link.match(/vimeo\.com\/(\d+)/);
-    if(m) return 'https://player.vimeo.com/video/' + m[1];
+    if(m) return { url: 'https://player.vimeo.com/video/' + m[1] + '?title=0&byline=0&portrait=0&dnt=1', isYoutube: false };
     m = link.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-    if(m) return 'https://drive.google.com/file/d/' + m[1] + '/preview';
+    if(m) return { url: 'https://drive.google.com/file/d/' + m[1] + '/preview', isYoutube: false };
     return null;
   }
+
+  let toastTimer = null;
+  function showVideoToast(){
+    const toast = document.getElementById('video-toast');
+    if(!toast) return;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> toast.classList.remove('show'), 2600);
+  }
+  document.getElementById('yt-shield-top').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
+  document.getElementById('yt-shield-corner').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
 
   function openVideoModal(link, titulo){
     const embed = toEmbedUrl(link);
     if(!embed){ window.open(link, '_blank'); return; }
-    document.getElementById('video-modal-iframe').src = embed;
+    document.getElementById('video-modal-iframe').src = embed.url;
     document.getElementById('video-modal-title').textContent = titulo || '';
+    document.getElementById('video-modal-frame').classList.toggle('yt-embed', embed.isYoutube);
     document.getElementById('video-modal').style.display = 'flex';
   }
 

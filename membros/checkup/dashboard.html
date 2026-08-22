@@ -372,12 +372,15 @@
 <div class="video-modal-overlay" id="video-modal" style="display:none;">
   <div class="video-modal-box">
     <button type="button" class="video-modal-close" id="video-modal-close">✕</button>
-    <div class="video-modal-frame">
+    <div class="video-modal-frame" id="video-modal-frame">
       <iframe id="video-modal-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      <div class="yt-shield yt-shield-top" id="yt-shield-top"></div>
+      <div class="yt-shield yt-shield-corner" id="yt-shield-corner"></div>
     </div>
     <div class="video-modal-title" id="video-modal-title"></div>
   </div>
 </div>
+<div class="video-toast" id="video-toast">Este vídeo é exclusivo desta plataforma — assista por aqui 💛</div>
 
 <script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
@@ -713,17 +716,35 @@
   function toEmbedUrl(link){
     if(!link) return null;
     let m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
-    if(m) return 'https://www.youtube.com/embed/' + m[1];
+    if(m) return { url: 'https://www.youtube-nocookie.com/embed/' + m[1] + '?rel=0&modestbranding=1&iv_load_policy=3', isYoutube: true };
     m = link.match(/vimeo\.com\/(\d+)/);
-    if(m) return 'https://player.vimeo.com/video/' + m[1];
+    if(m) return { url: 'https://player.vimeo.com/video/' + m[1] + '?title=0&byline=0&portrait=0&dnt=1', isYoutube: false };
     return null;
   }
+
+  function toThumbUrl(link){
+    if(!link) return null;
+    const m = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+    return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : null;
+  }
+
+  let toastTimer = null;
+  function showVideoToast(){
+    const toast = document.getElementById('video-toast');
+    if(!toast) return;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> toast.classList.remove('show'), 2600);
+  }
+  document.getElementById('yt-shield-top').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
+  document.getElementById('yt-shield-corner').addEventListener('click', (e)=>{ e.preventDefault(); showVideoToast(); });
 
   function openVideoModal(link, titulo){
     const embed = toEmbedUrl(link);
     if(!embed){ window.open(link, '_blank'); return; }
-    document.getElementById('video-modal-iframe').src = embed;
+    document.getElementById('video-modal-iframe').src = embed.url;
     document.getElementById('video-modal-title').textContent = titulo || '';
+    document.getElementById('video-modal-frame').classList.toggle('yt-embed', embed.isYoutube);
     document.getElementById('video-modal').style.display = 'flex';
   }
 
@@ -736,8 +757,18 @@
     if(e.target.id === 'video-modal') closeVideoModal();
   });
 
+  const BOAS_VINDAS_LINK = 'https://youtube.com/shorts/CE86c2NyIMg';
+  (function(){
+    const thumb = toThumbUrl(BOAS_VINDAS_LINK);
+    const el = document.querySelector('#video-boas-vindas .video-thumb');
+    if(thumb && el){
+      el.style.backgroundImage = "linear-gradient(180deg,rgba(59,32,36,0) 55%,rgba(59,32,36,.55) 100%), url('" + thumb + "')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+    }
+  })();
   document.getElementById('video-boas-vindas').addEventListener('click', ()=>{
-    openVideoModal('https://youtube.com/shorts/CE86c2NyIMg', 'Boas-vindas ao Check-up Alimentar Funcional');
+    openVideoModal(BOAS_VINDAS_LINK, 'Boas-vindas ao Check-up Alimentar Funcional');
   });
 </script>
 </body>
