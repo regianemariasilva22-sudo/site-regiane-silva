@@ -29,6 +29,10 @@
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
         Início
       </a></li>
+      <li><a href="#notificacoes" onclick="showTab('notificacoes');return false;">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+        Notificações <span id="notification-badge" class="mli-tag" style="display:none;margin-left:auto;">0</span>
+      </a></li>
       <li><a href="#aulas" onclick="showTab('aulas');return false;">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
         Aulas &amp; Vídeos
@@ -163,6 +167,18 @@
           <a href="#comunidade" onclick="showTab('comunidade');return false;" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:10px;">Ver comunidade &nbsp;→</a>
         </div>
       </div>
+    </div>
+
+    <!-- NOTIFICAÇÕES E ROTINAS TAB -->
+    <div id="tab-notificacoes" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Minha rotina</h1>
+      <p class="mem-sub">Suas metas e os lembretes individuais definidos pela Regiane.</p>
+
+      <h3 style="margin:24px 0 12px;">Orientações ativas</h3>
+      <div id="patient-routines-list"><p class="card-text" style="color:var(--muted);">Carregando suas orientações...</p></div>
+
+      <h3 style="margin:32px 0 12px;">Central de notificações</h3>
+      <div id="patient-notifications-list"><p class="card-text" style="color:var(--muted);">Carregando notificações...</p></div>
     </div>
 
     <!-- AULAS TAB -->
@@ -416,6 +432,32 @@
         </div>
       </div>
 
+      <h3 style="margin-bottom:14px;">Rotinas e lembretes individuais</h3>
+      <div class="mem-panel" style="margin-bottom:36px;">
+        <p class="card-text" style="margin-bottom:14px;">Escolha a paciente, defina a meta e os horários. Ela receberá um aviso inicial e lembretes por e-mail nos horários cadastrados.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <select id="routine-patient" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;"><option value="">Escolha a paciente</option></select>
+          <select id="routine-category" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;">
+            <option value="Água">Água</option><option value="Alimentação">Alimentação</option><option value="Treino">Treino</option><option value="Medida">Outra orientação</option>
+          </select>
+          <input id="routine-title" type="text" placeholder="Título (ex: Meta de água)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="routine-meta-value" type="number" min="0" step="0.1" placeholder="Meta (ex: 2)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="routine-meta-unit" type="text" placeholder="Unidade (ex: litros por dia)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="routine-times" type="text" placeholder="Horários: 08:00,10:00,12:00" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="routine-start" type="date" title="Data inicial" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="routine-end" type="date" title="Data final (opcional)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;" id="routine-days">
+          <label><input type="checkbox" value="SEG" checked> Seg</label><label><input type="checkbox" value="TER" checked> Ter</label><label><input type="checkbox" value="QUA" checked> Qua</label><label><input type="checkbox" value="QUI" checked> Qui</label><label><input type="checkbox" value="SEX" checked> Sex</label><label><input type="checkbox" value="SAB" checked> Sáb</label><label><input type="checkbox" value="DOM" checked> Dom</label>
+        </div>
+        <textarea id="routine-message" placeholder="Mensagem do lembrete (ex: Maria, está na hora de tomar sua água.)" style="width:100%;min-height:66px;margin-top:12px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="btn btn-primary btn-sm" id="routine-save">Salvar orientação</button>
+          <span id="routine-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+        <div id="admin-routines-list" style="margin-top:18px;"></div>
+      </div>
+
       <h3 style="margin-bottom:14px;">Pacientes</h3>
       <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
     </div>
@@ -488,10 +530,11 @@
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
     const tab = document.getElementById('tab-'+name);
     if(tab){ tab.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
-    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    if(typeof event !== 'undefined' && event.currentTarget) event.currentTarget.classList.add('active');
     if(window.__rebindCursor) window.__rebindCursor();
     if(name==='comunidade') loadComments();
     if(name==='calendario') loadSlots();
+    if(name==='notificacoes') loadRoutineData();
     if(name==='admin'){ loadAdminBookings(); loadAdminPatients(); }
   }
   document.querySelectorAll('.video-filter').forEach(btn=>{
@@ -586,6 +629,61 @@
     }
   }
   loadDashboardData();
+  loadRoutineData();
+
+  /* ── ROTINAS E CENTRAL DE NOTIFICAÇÕES DA PACIENTE ── */
+  async function loadRoutineData(){
+    const routinesWrap = document.getElementById('patient-routines-list');
+    const notificationsWrap = document.getElementById('patient-notifications-list');
+    if(!routinesWrap || !patientIdToken) return;
+    const res = await apiPost('patientRoutineData', { idToken: patientIdToken, email: patientEmail });
+    if(!res.ok){
+      routinesWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">' + (res.error || 'Não foi possível carregar suas orientações.') + '</p>';
+      return;
+    }
+    const badge = document.getElementById('notification-badge');
+    badge.textContent = res.naoLidas || 0;
+    badge.style.display = res.naoLidas ? 'inline-flex' : 'none';
+    routinesWrap.innerHTML = '';
+    if(!res.rotinas.length) routinesWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma orientação ativa no momento.</p>';
+    res.rotinas.forEach(r=>{
+      const card = document.createElement('div');
+      card.className = 'mem-panel reveal in';
+      card.style.marginBottom = '12px';
+      const meta = [r.metaValor, r.metaUnidade].filter(Boolean).join(' ');
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div><span class="mli-tag"></span><h3 style="margin:8px 0 4px;"></h3><p class="card-text routine-meta" style="font-weight:600;"></p><p class="card-text routine-message"></p><p class="card-text routine-schedule" style="margin-top:8px;color:var(--muted);"></p></div><button class="btn btn-primary btn-sm routine-complete" type="button">Marcar como realizada</button></div><span class="routine-complete-status" style="font-size:12.5px;color:var(--muted);"></span>`;
+      card.querySelector('.mli-tag').textContent = r.categoria || 'Rotina';
+      card.querySelector('h3').textContent = r.titulo;
+      card.querySelector('.routine-meta').textContent = meta;
+      card.querySelector('.routine-message').textContent = r.mensagem || '';
+      card.querySelector('.routine-schedule').textContent = 'Dias: ' + r.diasSemana + ' · Horários: ' + r.horarios;
+      const btn = card.querySelector('.routine-complete');
+      btn.addEventListener('click', async ()=>{
+        btn.disabled = true;
+        const done = await apiPost('patientCompleteRoutine', { idToken: patientIdToken, email: patientEmail, routineId: r.id });
+        card.querySelector('.routine-complete-status').textContent = done.ok ? 'Realizada hoje ✓' : (done.error || 'Não foi possível registrar.');
+        if(!done.ok) btn.disabled = false;
+      });
+      routinesWrap.appendChild(card);
+    });
+    notificationsWrap.innerHTML = '';
+    if(!res.notificacoes.length) notificationsWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma notificação ainda.</p>';
+    res.notificacoes.forEach(n=>{
+      const item = document.createElement('div');
+      item.className = 'mem-list-item';
+      item.style.background = n.lida ? 'transparent' : 'var(--rose-mist)';
+      item.innerHTML = `<div class="mli-icon">🔔</div><div style="flex:1;"><div class="mli-title"></div><div class="mli-sub"></div><div class="mli-sub notification-date" style="margin-top:4px;"></div></div><button type="button" class="btn btn-outline btn-sm notification-read" style="display:${n.lida ? 'none' : 'inline-flex'};">Marcar como lida</button>`;
+      item.querySelector('.mli-title').textContent = n.titulo;
+      item.querySelector('.mli-sub').textContent = n.mensagem;
+      item.querySelector('.notification-date').textContent = n.agendadaPara ? new Date(n.agendadaPara).toLocaleString('pt-BR') : '';
+      item.querySelector('.notification-read').addEventListener('click', async e=>{
+        const read = await apiPost('patientReadNotification', { idToken: patientIdToken, email: patientEmail, id: n.id });
+        if(read.ok){ e.target.style.display='none'; item.style.background='transparent'; loadRoutineData(); }
+      });
+      notificationsWrap.appendChild(item);
+    });
+    if(window.__rebindCursor) window.__rebindCursor();
+  }
 
   /* ── VÍDEOS: card + player embutido na plataforma (não abre o YouTube) ── */
   function toThumbUrl(link){
@@ -875,6 +973,20 @@
       });
     }
 
+    const routinePatient = document.getElementById('routine-patient');
+    if(routinePatient){
+      const currentValue = routinePatient.value;
+      routinePatient.querySelectorAll('option[data-patient]').forEach(o=>o.remove());
+      res.pacientes.forEach(p=>{
+        const opt = document.createElement('option');
+        opt.value = p.email;
+        opt.dataset.patient = '1';
+        opt.textContent = p.nome || p.email;
+        routinePatient.appendChild(opt);
+      });
+      routinePatient.value = currentValue;
+    }
+
     wrap.innerHTML = '';
     res.pacientes.forEach(p=>{
       const card = document.createElement('div');
@@ -939,6 +1051,64 @@
       wrap.appendChild(card);
     });
     if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  async function loadAdminRoutines(){
+    const email = document.getElementById('routine-patient').value;
+    const wrap = document.getElementById('admin-routines-list');
+    if(!email){ wrap.innerHTML = ''; return; }
+    const res = await apiPost('adminListRoutines', { idToken: patientIdToken, email });
+    if(!res.ok){ wrap.innerHTML = '<p class="card-text">' + (res.error || 'Erro ao carregar orientações.') + '</p>'; return; }
+    wrap.innerHTML = res.rotinas.length ? '<h4 style="margin-bottom:8px;">Orientações cadastradas</h4>' : '<p class="card-text" style="color:var(--muted);">Nenhuma orientação cadastrada para esta paciente.</p>';
+    res.rotinas.forEach(r=>{
+      const row = document.createElement('div');
+      row.className = 'mem-list-item';
+      row.innerHTML = `<div style="flex:1;"><div class="mli-title"></div><div class="mli-sub"></div></div><button type="button" class="btn btn-outline btn-sm routine-delete">Excluir</button>`;
+      row.querySelector('.mli-title').textContent = r.titulo + (r.ativo ? '' : ' — inativa');
+      row.querySelector('.mli-sub').textContent = (r.metaValor ? r.metaValor + ' ' + r.metaUnidade + ' · ' : '') + r.diasSemana + ' · ' + r.horarios;
+      row.querySelector('.routine-delete').addEventListener('click', async ()=>{
+        if(!confirm('Excluir esta orientação?')) return;
+        const del = await apiPost('adminDeleteRoutine', { idToken: patientIdToken, id: r.id });
+        if(del.ok) loadAdminRoutines();
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  const routinePatientSelect = document.getElementById('routine-patient');
+  if(routinePatientSelect) routinePatientSelect.addEventListener('change', loadAdminRoutines);
+  const routineSaveBtn = document.getElementById('routine-save');
+  if(routineSaveBtn){
+    routineSaveBtn.addEventListener('click', async ()=>{
+      const email = document.getElementById('routine-patient').value;
+      const titulo = document.getElementById('routine-title').value.trim();
+      const horarios = document.getElementById('routine-times').value.trim();
+      const status = document.getElementById('routine-status');
+      const diasSemana = Array.from(document.querySelectorAll('#routine-days input:checked')).map(i=>i.value).join(',');
+      if(!email || !titulo || !horarios || !diasSemana){ status.textContent = 'Escolha a paciente e preencha título, dias e horários.'; return; }
+      routineSaveBtn.disabled = true;
+      status.textContent = 'Salvando e notificando...';
+      const r = await apiPost('adminSaveRoutine', {
+        idToken: patientIdToken, email,
+        categoria: document.getElementById('routine-category').value,
+        titulo, metaValor: document.getElementById('routine-meta-value').value,
+        metaUnidade: document.getElementById('routine-meta-unit').value.trim(),
+        horarios, diasSemana, mensagem: document.getElementById('routine-message').value.trim(),
+        dataInicio: document.getElementById('routine-start').value,
+        dataFim: document.getElementById('routine-end').value,
+        ativo: true
+      });
+      routineSaveBtn.disabled = false;
+      status.textContent = r.ok ? 'Orientação salva e paciente avisada ✓' : (r.error || 'Erro ao salvar.');
+      if(r.ok){
+        document.getElementById('routine-title').value = '';
+        document.getElementById('routine-meta-value').value = '';
+        document.getElementById('routine-meta-unit').value = '';
+        document.getElementById('routine-times').value = '';
+        document.getElementById('routine-message').value = '';
+        loadAdminRoutines();
+      }
+    });
   }
 
   const matAddBtn = document.getElementById('mat-add-btn');

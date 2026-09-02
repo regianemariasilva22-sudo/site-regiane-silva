@@ -116,6 +116,12 @@ function doPost(e) {
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
+    if (action === 'adminListRoutines') return jsonResponse(actionAdminListRoutines(body));
+    if (action === 'adminSaveRoutine') return jsonResponse(actionAdminSaveRoutine(body));
+    if (action === 'adminDeleteRoutine') return jsonResponse(actionAdminDeleteRoutine(body));
+    if (action === 'patientRoutineData') return jsonResponse(actionPatientRoutineData(body));
+    if (action === 'patientCompleteRoutine') return jsonResponse(actionPatientCompleteRoutine(body));
+    if (action === 'patientReadNotification') return jsonResponse(actionPatientReadNotification(body));
     if (action === 'adminListPendingBookings') return jsonResponse(actionAdminListPendingBookings(body));
     if (action === 'adminConfirmBooking') return jsonResponse(actionAdminConfirmBooking(body));
     if (action === 'adminRejectBooking') return jsonResponse(actionAdminRejectBooking(body));
@@ -351,6 +357,7 @@ function actionAdminSavePlan(body) {
   for (let i = 1; i < data.length; i++) {
     if (normEmail(data[i][emailCol]) === email) {
       sheet.getRange(i + 1, planoCol + 1).setValue(body.planoTexto || '');
+      createImmediateNotification_(email, 'Seu plano foi atualizado', 'A Regiane publicou uma nova orientação no seu plano. Acesse a área de membros para conferir.', 'plano');
       return { ok: true };
     }
   }
@@ -407,6 +414,303 @@ function actionAdminAddMaterial(body) {
   sheet.appendRow([id, destino === 'todos' ? 'TODOS' : destino, body.tipo || tipoPadrao, titulo, body.descricao || '', link, area]);
 
   return { ok: true };
+}
+
+// ── ROTINAS E NOTIFICAÇÕES INDIVIDUAIS ──────────────────
+
+const NOTIFICATION_TIMEZONE = 'America/Sao_Paulo';
+
+function ensureNotificationSheets_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let rotinas = ss.getSheetByName('Rotinas');
+  if (!rotinas) {
+    rotinas = ss.insertSheet('Rotinas');
+    rotinas.appendRow(['Id', 'Email', 'Titulo', 'Categoria', 'MetaValor', 'MetaUnidade', 'DiasSemana', 'Horarios', 'Mensagem', 'Ativo', 'DataInicio', 'DataFim', 'CriadoEm', 'AtualizadoEm']);
+    rotinas.setFrozenRows(1);
+  }
+  let notificacoes = ss.getSheetByName('Notificacoes');
+  if (!notificacoes) {
+    notificacoes = ss.insertSheet('Notificacoes');
+    notificacoes.appendRow(['Id', 'RotinaId', 'Email', 'Titulo', 'Mensagem', 'AgendadaPara', 'EnviadaEm', 'LidaEm', 'ConcluidaEm', 'Status']);
+    notificacoes.setFrozenRows(1);
+  }
+  return { rotinas: rotinas, notificacoes: notificacoes };
+}
+
+function routineObjects_() {
+  return sheetToObjects(ensureNotificationSheets_().rotinas);
+}
+
+function notificationObjects_() {
+  return sheetToObjects(ensureNotificationSheets_().notificacoes);
+}
+
+function patientEmailFromToken_(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const requested = normEmail(body.email || body.targetEmail);
+  if (requested && requested !== auth.email) {
+    if (!isAdmin(auth.email)) throw new Error('Você não pode acessar as orientações de outra paciente.');
+    return requested;
+  }
+  return auth.email;
+}
+
+function normalizeTimes_(value) {
+  const times = String(value || '').split(/[;,\s]+/).map(function(v) { return v.trim(); }).filter(Boolean);
+  const valid = [];
+  times.forEach(function(v) {
+    const m = v.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h >= 0 && h <= 23 && min >= 0 && min <= 59) valid.push(('0' + h).slice(-2) + ':' + ('0' + min).slice(-2));
+  });
+  return Array.from(new Set(valid)).sort().join(',');
+}
+
+function notificationDateKey_(value) {
+  if (!value) return '';
+  const text = String(value).trim();
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return iso[1] + iso[2] + iso[3];
+  const date = value instanceof Date ? value : new Date(value);
+  return isNaN(date.getTime()) ? '' : Utilities.formatDate(date, NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+}
+
+function isRoutineActiveToday_(routine) {
+  if (String(routine.Ativo).trim().toLowerCase() === 'não') return false;
+  const todayKey = Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  const startKey = notificationDateKey_(routine.DataInicio);
+  const endKey = notificationDateKey_(routine.DataFim);
+  return !(startKey && todayKey < startKey) && !(endKey && todayKey > endKey);
+}
+
+function actionAdminListRoutines(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  return {
+    ok: true,
+    rotinas: routineObjects_().filter(function(r) { return !email || normEmail(r.Email) === email; }).map(function(r) {
+      return {
+        id: String(r.Id), email: normEmail(r.Email), titulo: r.Titulo || '', categoria: r.Categoria || '',
+        metaValor: r.MetaValor || '', metaUnidade: r.MetaUnidade || '', diasSemana: r.DiasSemana || '',
+        horarios: r.Horarios || '', mensagem: r.Mensagem || '', ativo: String(r.Ativo).toLowerCase() !== 'não',
+        dataInicio: r.DataInicio || '', dataFim: r.DataFim || ''
+      };
+    })
+  };
+}
+
+function actionAdminSaveRoutine(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const paciente = findPatientRow(email);
+  if (!paciente) return { ok: false, error: 'Paciente não encontrada na aba Pacientes.' };
+  const titulo = String(body.titulo || '').trim();
+  if (!titulo) return { ok: false, error: 'Informe o título da orientação.' };
+  const horarios = normalizeTimes_(body.horarios);
+  if (!horarios) return { ok: false, error: 'Informe pelo menos um horário no formato HH:MM.' };
+  const sheets = ensureNotificationSheets_();
+  const sheet = sheets.rotinas;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const id = String(body.id || new Date().getTime());
+  const values = {
+    Id: id, Email: email, Titulo: titulo, Categoria: body.categoria || 'Rotina',
+    MetaValor: body.metaValor || '', MetaUnidade: body.metaUnidade || '',
+    DiasSemana: body.diasSemana || 'SEG,TER,QUA,QUI,SEX,SAB,DOM', Horarios: horarios,
+    Mensagem: body.mensagem || ('Está na hora de: ' + titulo), Ativo: body.ativo === false ? 'Não' : 'Sim',
+    DataInicio: body.dataInicio || '', DataFim: body.dataFim || '', AtualizadoEm: new Date()
+  };
+  let updated = false;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][headers.indexOf('Id')]) === id) {
+      headers.forEach(function(h, idx) { if (values[h] !== undefined) sheet.getRange(i + 1, idx + 1).setValue(values[h]); });
+      updated = true;
+      break;
+    }
+  }
+  if (!updated) {
+    values.CriadoEm = new Date();
+    sheet.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+  }
+  const triggerConfigured = ensureNotificationTrigger_();
+  createImmediateNotification_(email, 'Nova orientação disponível', 'A Regiane adicionou "' + titulo + '" à sua rotina. Acesse a área de membros para ver os horários e detalhes.', 'rotina-' + id);
+  return { ok: true, id: id, triggerConfigured: triggerConfigured };
+}
+
+function actionAdminDeleteRoutine(body) {
+  assertAdmin(body.idToken);
+  const id = String(body.id || '');
+  const sheet = ensureNotificationSheets_().rotinas;
+  const data = sheet.getDataRange().getValues();
+  const idCol = data[0].indexOf('Id');
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][idCol]) === id) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Orientação não encontrada.' };
+}
+
+function actionPatientRoutineData(body) {
+  const email = patientEmailFromToken_(body);
+  const routines = routineObjects_().filter(function(r) {
+    return normEmail(r.Email) === email && isRoutineActiveToday_(r);
+  }).map(function(r) {
+    return {
+      id: String(r.Id), titulo: r.Titulo || '', categoria: r.Categoria || '', metaValor: r.MetaValor || '',
+      metaUnidade: r.MetaUnidade || '', diasSemana: r.DiasSemana || '', horarios: r.Horarios || '', mensagem: r.Mensagem || ''
+    };
+  });
+  const notifications = notificationObjects_().filter(function(n) { return normEmail(n.Email) === email; })
+    .sort(function(a, b) { return new Date(b.AgendadaPara) - new Date(a.AgendadaPara); }).slice(0, 50)
+    .map(function(n) {
+      return { id: String(n.Id), rotinaId: String(n.RotinaId || ''), titulo: n.Titulo || '', mensagem: n.Mensagem || '',
+        agendadaPara: n.AgendadaPara || '', lida: !!n.LidaEm, concluida: !!n.ConcluidaEm, status: n.Status || '' };
+    });
+  return { ok: true, email: email, rotinas: routines, notificacoes: notifications, naoLidas: notifications.filter(function(n) { return !n.lida; }).length };
+}
+
+function actionPatientCompleteRoutine(body) {
+  const email = patientEmailFromToken_(body);
+  const routineId = String(body.routineId || '');
+  const routine = routineObjects_().find(function(r) { return String(r.Id) === routineId && normEmail(r.Email) === email; });
+  if (!routine) return { ok: false, error: 'Orientação não encontrada.' };
+  const sheets = ensureNotificationSheets_();
+  const id = 'feito-' + routineId + '-' + Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  const data = sheets.notificacoes.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('Id');
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === id) {
+      sheets.notificacoes.getRange(i + 1, headers.indexOf('ConcluidaEm') + 1).setValue(new Date());
+      sheets.notificacoes.getRange(i + 1, headers.indexOf('Status') + 1).setValue('Concluída');
+      return { ok: true };
+    }
+  }
+  sheets.notificacoes.appendRow([id, routineId, email, routine.Titulo, body.observacao || 'Atividade marcada como realizada pela paciente.', new Date(), '', new Date(), new Date(), 'Concluída']);
+  return { ok: true };
+}
+
+function actionPatientReadNotification(body) {
+  const email = patientEmailFromToken_(body);
+  const id = String(body.id || '');
+  const sheet = ensureNotificationSheets_().notificacoes;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][headers.indexOf('Id')]) === id && normEmail(data[i][headers.indexOf('Email')]) === email) {
+      sheet.getRange(i + 1, headers.indexOf('LidaEm') + 1).setValue(new Date());
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Notificação não encontrada.' };
+}
+
+function createImmediateNotification_(email, titulo, mensagem, routineId) {
+  const sheets = ensureNotificationSheets_();
+  const id = 'imediata-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+  const now = new Date();
+  sheets.notificacoes.appendRow([id, routineId || '', normEmail(email), titulo, mensagem, now, now, '', '', 'Enviada']);
+  try {
+    MailApp.sendEmail({
+      to: normEmail(email),
+      subject: titulo + ' — Regiane Silva',
+      body: mensagem + '\n\nAcesse sua área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
+    });
+  } catch (err) {
+    const row = sheets.notificacoes.getLastRow();
+    sheets.notificacoes.getRange(row, 10).setValue('Erro no e-mail: ' + String(err));
+  }
+  return id;
+}
+
+function ensureNotificationTrigger_() {
+  try {
+    const exists = ScriptApp.getProjectTriggers().some(function(t) { return t.getHandlerFunction() === 'processScheduledNotifications'; });
+    if (!exists) ScriptApp.newTrigger('processScheduledNotifications').timeBased().everyMinutes(5).create();
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function processScheduledNotifications() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
+  try {
+    const now = new Date();
+    const dateKey = Utilities.formatDate(now, NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+    const dayCode = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'][Number(Utilities.formatDate(now, NOTIFICATION_TIMEZONE, 'u')) % 7];
+    const currentMinutes = Number(Utilities.formatDate(now, NOTIFICATION_TIMEZONE, 'H')) * 60 + Number(Utilities.formatDate(now, NOTIFICATION_TIMEZONE, 'm'));
+    const sentIds = {};
+    notificationObjects_().forEach(function(n) { sentIds[String(n.Id)] = true; });
+    routineObjects_().forEach(function(r) {
+      if (!isRoutineActiveToday_(r)) return;
+      const days = String(r.DiasSemana || '').split(',').map(function(v) { return v.trim().toUpperCase(); });
+      if (days.indexOf(dayCode) === -1) return;
+      normalizeTimes_(r.Horarios).split(',').filter(Boolean).forEach(function(time) {
+        const parts = time.split(':');
+        const scheduledMinutes = Number(parts[0]) * 60 + Number(parts[1]);
+        const delta = currentMinutes - scheduledMinutes;
+        if (delta < 0 || delta > 9) return;
+        const id = 'rotina-' + r.Id + '-' + dateKey + '-' + time.replace(':', '');
+        if (sentIds[id]) return;
+        const when = new Date(now.getTime() - delta * 60000);
+        const sheets = ensureNotificationSheets_();
+        let status = 'Enviada';
+        try {
+          MailApp.sendEmail({
+            to: normEmail(r.Email), subject: (r.Titulo || 'Lembrete') + ' — Regiane Silva',
+            body: (r.Mensagem || ('Está na hora de: ' + r.Titulo)) + '\n\nConfira sua rotina na área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
+          });
+        } catch (err) { status = 'Erro no e-mail: ' + String(err); }
+        sheets.notificacoes.appendRow([id, r.Id, normEmail(r.Email), r.Titulo, r.Mensagem, when, status === 'Enviada' ? now : '', '', '', status]);
+        sentIds[id] = true;
+      });
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Teste controlado solicitado pela Aline. Cria uma paciente simbólica,
+ * envia um lembrete real e limita a rotina ao dia do teste para não gerar spam. */
+function testarNotificacoesBabados() {
+  const email = 'babadosdaaline@gmail.com';
+  const patientSheet = getSheet('Pacientes');
+  if (!findPatientRow(email)) {
+    const headers = patientSheet.getRange(1, 1, 1, patientSheet.getLastColumn()).getValues()[0];
+    const values = { Email: email, Nome: 'Maria — Teste de Notificações', DataInicio: new Date(), PlanoTexto: 'Paciente simbólica para validar as notificações.', PontosTotal: 0 };
+    patientSheet.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+  }
+  const sheets = ensureNotificationSheets_();
+  const id = 'teste-agua-babados';
+  const existing = routineObjects_().find(function(r) { return String(r.Id) === id; });
+  if (existing) {
+    const data = sheets.rotinas.getDataRange().getValues();
+    const headers = data[0];
+    const idCol = headers.indexOf('Id');
+    for (let i = 1; i < data.length; i++) if (String(data[i][idCol]) === id) sheets.rotinas.deleteRow(i + 1);
+  }
+  const today = Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyy-MM-dd');
+  sheets.rotinas.appendRow([id, email, 'Meta de água', 'Água', 2, 'litros por dia', 'SEG,TER,QUA,QUI,SEX,SAB,DOM', '08:00,10:00,12:00,14:00,16:00,18:00,20:00', 'Maria, está na hora de tomar sua água. Sua meta diária é de 2 litros.', 'Sim', today, today, new Date(), new Date()]);
+  const notificationId = createImmediateNotification_(email, 'Meta de água — lembrete de teste', 'Maria, está na hora de tomar sua água. Sua meta diária é de 2 litros. Este é o teste solicitado pela Aline.', id);
+  const triggerConfigured = ensureNotificationTrigger_();
+  const notification = notificationObjects_().find(function(n) { return String(n.Id) === notificationId; });
+  return {
+    ok: !!notification && String(notification.Status) === 'Enviada',
+    email: email,
+    patient: 'Maria — Teste de Notificações',
+    routineId: id,
+    notificationId: notificationId,
+    notificationStatus: notification ? notification.Status : 'Não encontrada',
+    triggerConfigured: triggerConfigured,
+    routineActiveToday: true,
+    routineEndsToday: true
+  };
 }
 
 // ── COMUNIDADE / COMENTÁRIOS ────────────────────────────
@@ -925,6 +1229,14 @@ function setupSheetStructure() {
 
   buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao', 'Nome', 'IsoInicio'], null);
 
+  buildSheet('Rotinas',
+    ['Id', 'Email', 'Titulo', 'Categoria', 'MetaValor', 'MetaUnidade', 'DiasSemana', 'Horarios', 'Mensagem', 'Ativo', 'DataInicio', 'DataFim', 'CriadoEm', 'AtualizadoEm'],
+    null);
+
+  buildSheet('Notificacoes',
+    ['Id', 'RotinaId', 'Email', 'Titulo', 'Mensagem', 'AgendadaPara', 'EnviadaEm', 'LidaEm', 'ConcluidaEm', 'Status'],
+    null);
+
   buildSheet('CheckupPacientes',
     ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'RespostasChecklist', 'RespostasQuiz', 'DataCheckup'],
     ['exemplo@checkup.com', 'Nome de Exemplo', new Date(), 'Sim', 'Não', '', '', '']);
@@ -944,7 +1256,7 @@ function setupSheetStructure() {
   });
 
   // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
-  const ordem = ['Pacientes', 'CheckupPacientes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog', 'BioLeadsQuiz', 'BioNewsletter'];
+  const ordem = ['Pacientes', 'CheckupPacientes', 'Rotinas', 'Notificacoes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog', 'BioLeadsQuiz', 'BioNewsletter'];
   ordem.forEach((nome, i) => {
     const s = ss.getSheetByName(nome);
     if (s) ss.setActiveSheet(s);
