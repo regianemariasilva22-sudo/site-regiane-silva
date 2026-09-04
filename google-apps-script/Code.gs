@@ -13,6 +13,13 @@ const GOOGLE_CLIENT_ID = '288771217381-mt5g3dhdjhcoak6kphd1fhsarrkd44bc.apps.goo
 // E-mail da Regiane, para onde vão os avisos de novo cadastro/acesso liberado
 const REGIANE_NOTIFICATION_EMAIL = 'regianemariasilva22@gmail.com';
 
+// Todo e-mail direcionado às pacientes deve sair do endereço real da Regiane.
+// O endereço precisa estar confirmado em "Enviar e-mail como" na conta que
+// executa este Apps Script; caso contrário, o envio falha em vez de usar
+// silenciosamente o e-mail da Aline como remetente.
+const PATIENT_SENDER_EMAIL = REGIANE_NOTIFICATION_EMAIL;
+const PATIENT_SENDER_NAME = 'Regiane Silva';
+
 // E-mails com acesso de administradora a qualquer área do site, sem precisar
 // estar cadastrado nas planilhas de pacientes.
 const ADMIN_EMAILS = ['divarebel.on@gmail.com', 'babadosdaaline@gmail.com', 'regianemariasilva22@gmail.com'];
@@ -46,6 +53,19 @@ function jsonResponse(obj) {
 
 function normEmail(email) {
   return String(email || '').trim().toLowerCase();
+}
+
+function sendPatientEmail_(to, subject, body) {
+  const sender = normEmail(PATIENT_SENDER_EMAIL);
+  const aliases = GmailApp.getAliases().map(normEmail);
+  if (aliases.indexOf(sender) === -1) {
+    throw new Error('O endereço da Regiane ainda não está autorizado como remetente no Gmail.');
+  }
+  GmailApp.sendEmail(normEmail(to), subject, body, {
+    from: sender,
+    name: PATIENT_SENDER_NAME,
+    replyTo: sender
+  });
 }
 
 /**
@@ -615,11 +635,11 @@ function createImmediateNotification_(email, titulo, mensagem, routineId) {
   const now = new Date();
   sheets.notificacoes.appendRow([id, routineId || '', normEmail(email), titulo, mensagem, now, now, '', '', 'Enviada']);
   try {
-    MailApp.sendEmail({
-      to: normEmail(email),
-      subject: titulo + ' — Regiane Silva',
-      body: mensagem + '\n\nAcesse sua área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
-    });
+    sendPatientEmail_(
+      email,
+      titulo + ' — Regiane Silva',
+      mensagem + '\n\nAcesse sua área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
+    );
   } catch (err) {
     const row = sheets.notificacoes.getLastRow();
     sheets.notificacoes.getRange(row, 10).setValue('Erro no e-mail: ' + String(err));
@@ -662,10 +682,11 @@ function processScheduledNotifications() {
         const sheets = ensureNotificationSheets_();
         let status = 'Enviada';
         try {
-          MailApp.sendEmail({
-            to: normEmail(r.Email), subject: (r.Titulo || 'Lembrete') + ' — Regiane Silva',
-            body: (r.Mensagem || ('Está na hora de: ' + r.Titulo)) + '\n\nConfira sua rotina na área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
-          });
+          sendPatientEmail_(
+            r.Email,
+            (r.Titulo || 'Lembrete') + ' — Regiane Silva',
+            (r.Mensagem || ('Está na hora de: ' + r.Titulo)) + '\n\nConfira sua rotina na área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
+          );
         } catch (err) { status = 'Erro no e-mail: ' + String(err); }
         sheets.notificacoes.appendRow([id, r.Id, normEmail(r.Email), r.Titulo, r.Mensagem, when, status === 'Enviada' ? now : '', '', '', status]);
         sentIds[id] = true;
@@ -1051,7 +1072,7 @@ function actionSubmitCheckup(body) {
   const resumo = formatCheckupRespostas(body.respostasChecklist, body.respostasQuiz);
 
   try {
-    MailApp.sendEmail(auth.email, 'Suas respostas do Check-up Alimentar — Regiane Silva',
+    sendPatientEmail_(auth.email, 'Suas respostas do Check-up Alimentar — Regiane Silva',
       'Oi, ' + nome + '! Aqui está uma cópia das suas respostas no Check-up Alimentar Funcional:\n\n' + resumo);
   } catch (err) {
     // não deixa o fluxo principal quebrar se o e-mail falhar
