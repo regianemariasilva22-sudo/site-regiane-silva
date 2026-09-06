@@ -1106,7 +1106,7 @@ document.addEventListener('click',e=>{
 });
 
 // ─── ENVIO DOS LEADS (backend da Regiane, mesmo Apps Script do site) ──
-const WH='https://script.google.com/macros/s/AKfycbykDiX4gWybvlRh2s-iZCb_q3UH0bE2HVuG23eYsvu-nyOEHCTyF4oquAZf1BzYqdGN2Q/exec';
+const WH='https://script.google.com/macros/s/AKfycbzNaXIEFi3rCW32qdzsfVJ97b0_hlPTsOx5X4vYWEPMGqoyqxrjKZ2KdyxfzLqhdSW9jQ/exec';
 function post(d){
   fetch(WH,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:'bioLead'},d))}).catch(()=>{});
 }
@@ -1118,7 +1118,18 @@ const PROF={
   'ja-tentei':{title:'O problema volta porque a causa nunca foi tratada',diag:'Você já tentou dieta ou nutricionista antes, mas o resultado nunca se sustenta. Isso quase sempre acontece porque o sintoma foi tratado — não a causa. É hora de investigar a fundo, com exames e histórico clínico completo.',steps:['História clínica completa: sintomas, rotina, intestino e metabolismo conectados','Solicitação e avaliação de exames específicos para o seu caso','Plano alimentar totalmente personalizado, feito pra durar'],curso:'Consulta Funcional Completa',icon:'🩺',badge:'Investigação completa'},
   'acompanhamento':{title:'Você está pronta para um acompanhamento de verdade',diag:'Você já sabe o que precisa — agora o que falta é consistência, com alguém acompanhando de perto cada passo até o resultado virar hábito.',steps:['3 consultas + retorno estratégico ao longo de 90 dias','Área de membros com aulas, receitas e o Raio-X do Rótulo','Sistema de pontos: cada foto de resultado vira crédito pros seus próximos passos'],curso:'Programa Reequilíbrio Funcional',icon:'🌿',badge:'90 dias'}
 };
-function getProf(p1){ return PROF[p1] || PROF['direcao-rapida']; }
+function getProf(p1,p2){
+  if(p1==='acompanhamento') return PROF.acompanhamento;
+  if(p1==='ja-tentei') return PROF['ja-tentei'];
+  if(p1==='direcao-rapida') return PROF['direcao-rapida'];
+  if(p1==='quero-investigar'){
+    // Questões metabólicas ou hormonais pedem uma avaliação completa;
+    // nos demais casos, o Check-up continua sendo a porta de entrada.
+    if(p2==='metabolico'||p2==='hormonal') return PROF['ja-tentei'];
+    return PROF['quero-investigar'];
+  }
+  return PROF['direcao-rapida'];
+}
 
 // ─── QUIZ ────────────────────────────────────────────────
 const A={p1:'',p2:''};
@@ -1145,7 +1156,7 @@ function finish(){
   const nome=document.getElementById('fN').value.trim();
   const tel=document.getElementById('fT').value.trim();
   const texto=document.getElementById('fTx').value.trim();
-  const pr=getProf(A.p1);
+  const pr=getProf(A.p1,A.p2);
   post({nome,telefone:tel,tag:'quiz',pergunta1:A.p1,pergunta2:A.p2,textoLivre:texto,cursoSugerido:pr.curso});
   document.getElementById('s3').classList.remove('on');
   document.getElementById('pFill').style.width='100%';

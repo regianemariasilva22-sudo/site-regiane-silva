@@ -459,6 +459,16 @@
       </div>
 
       <h3 style="margin-bottom:14px;">Pacientes</h3>
+      <div class="mem-panel" style="margin-bottom:18px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+          <input id="admin-patient-name" type="text" placeholder="Nome da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="admin-patient-email" type="email" placeholder="E-mail da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="btn btn-primary btn-sm" id="admin-patient-add">Adicionar paciente</button>
+          <span id="admin-patient-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+      </div>
       <div id="admin-patients-list"><p class="card-text" style="color:var(--muted);">Carregando pacientes...</p></div>
     </div>
   </main>
@@ -1004,6 +1014,7 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
           <button type="button" class="btn btn-primary btn-sm admin-plano-save">Salvar plano</button>
           <a class="btn btn-outline btn-sm" href="dashboard.html?as=${encodeURIComponent(p.email)}">Ver como paciente &nbsp;→</a>
+          <button type="button" class="btn btn-outline btn-sm admin-patient-remove">Remover paciente</button>
           <span class="admin-plano-status" style="font-size:12.5px;color:var(--muted);"></span>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rose-mist);">
@@ -1018,6 +1029,11 @@
       const textarea = card.querySelector('.admin-plano-input');
       const saveBtn = card.querySelector('.admin-plano-save');
       const status = card.querySelector('.admin-plano-status');
+      card.querySelector('.admin-patient-remove').addEventListener('click', async ()=>{
+        if(!confirm('Remover o acesso desta paciente? Os registros complementares serão preservados.')) return;
+        const removed = await apiPost('adminRemovePatient', { idToken: patientIdToken, email: p.email });
+        if(removed.ok) loadAdminPatients(); else status.textContent = removed.error || 'Erro ao remover.';
+      });
       saveBtn.addEventListener('click', async ()=>{
         saveBtn.disabled = true;
         const r = await apiPost('adminSavePlan', { idToken: patientIdToken, email: p.email, planoTexto: textarea.value });
@@ -1051,6 +1067,25 @@
       wrap.appendChild(card);
     });
     if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  const adminPatientAddBtn = document.getElementById('admin-patient-add');
+  if(adminPatientAddBtn){
+    adminPatientAddBtn.addEventListener('click', async ()=>{
+      const nome = document.getElementById('admin-patient-name').value.trim();
+      const email = document.getElementById('admin-patient-email').value.trim();
+      const status = document.getElementById('admin-patient-status');
+      if(!nome || !email){ status.textContent = 'Informe nome e e-mail.'; return; }
+      adminPatientAddBtn.disabled = true;
+      const res = await apiPost('adminAddPatient', { idToken: patientIdToken, nome, email });
+      adminPatientAddBtn.disabled = false;
+      status.textContent = res.ok ? 'Paciente adicionada ✓' : (res.error || 'Erro ao adicionar.');
+      if(res.ok){
+        document.getElementById('admin-patient-name').value = '';
+        document.getElementById('admin-patient-email').value = '';
+        loadAdminPatients();
+      }
+    });
   }
 
   async function loadAdminRoutines(){

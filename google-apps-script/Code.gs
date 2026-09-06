@@ -133,6 +133,8 @@ function doPost(e) {
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
     if (action === 'uploadFoto') return jsonResponse(actionUploadFoto(body));
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
+    if (action === 'adminAddPatient') return jsonResponse(actionAdminAddPatient(body));
+    if (action === 'adminRemovePatient') return jsonResponse(actionAdminRemovePatient(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
@@ -146,6 +148,8 @@ function doPost(e) {
     if (action === 'adminConfirmBooking') return jsonResponse(actionAdminConfirmBooking(body));
     if (action === 'adminRejectBooking') return jsonResponse(actionAdminRejectBooking(body));
     if (action === 'adminListCheckupPatients') return jsonResponse(actionAdminListCheckupPatients(body));
+    if (action === 'adminAddCheckupPatient') return jsonResponse(actionAdminAddCheckupPatient(body));
+    if (action === 'adminSetCheckupAccess') return jsonResponse(actionAdminSetCheckupAccess(body));
     if (action === 'bioLead') return jsonResponse(actionBioLead(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
@@ -358,6 +362,45 @@ function actionAdminListPatients(body) {
       planoPdfUrl: p.PlanoPdfUrl || ''
     }))
   };
+}
+
+function actionAdminAddPatient(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const nome = String(body.nome || '').trim();
+  if (!email || email.indexOf('@') === -1 || !nome) {
+    return { ok: false, error: 'Informe o nome e um e-mail válido.' };
+  }
+
+  const sheet = getSheet('Pacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const nomeCol = headers.indexOf('Nome');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, nomeCol + 1).setValue(nome);
+      return { ok: true, created: false };
+    }
+  }
+
+  sheet.appendRow([email, nome, new Date(), 0, 0, 0, '', '', '', 0, '', '']);
+  return { ok: true, created: true };
+}
+
+function actionAdminRemovePatient(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const sheet = getSheet('Pacientes');
+  const data = sheet.getDataRange().getValues();
+  const emailCol = data[0].indexOf('Email');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Paciente não encontrada.' };
 }
 
 /**
@@ -1150,6 +1193,52 @@ function actionAdminListCheckupPatients(body) {
       respostasQuiz: c.RespostasQuiz ? JSON.parse(c.RespostasQuiz) : null
     }))
   };
+}
+
+function actionAdminAddCheckupPatient(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const nome = String(body.nome || '').trim();
+  if (!email || email.indexOf('@') === -1 || !nome) {
+    return { ok: false, error: 'Informe o nome e um e-mail válido.' };
+  }
+
+  const sheet = getSheet('CheckupPacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const nomeCol = headers.indexOf('Nome');
+  const liberadoCol = headers.indexOf('Liberado');
+  const dataCol = headers.indexOf('DataLiberacao');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, nomeCol + 1).setValue(nome);
+      sheet.getRange(i + 1, liberadoCol + 1).setValue('Sim');
+      sheet.getRange(i + 1, dataCol + 1).setValue(new Date());
+      return { ok: true, created: false };
+    }
+  }
+
+  sheet.appendRow([email, nome, new Date(), 'Sim', 'Não', '', '', '']);
+  return { ok: true, created: true };
+}
+
+function actionAdminSetCheckupAccess(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const liberado = body.liberado ? 'Sim' : 'Não';
+  const sheet = getSheet('CheckupPacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const liberadoCol = headers.indexOf('Liberado');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, liberadoCol + 1).setValue(liberado);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Paciente do check-up não encontrada.' };
 }
 
 // ── LINK NA BIO (biolink.html) ───────────────────────────

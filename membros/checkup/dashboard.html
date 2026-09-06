@@ -364,6 +364,16 @@
     <div id="tab-admin" style="display:none;">
       <h1 class="mem-hello" style="font-size:28px;">Painel da Regiane</h1>
       <p class="mem-sub">Todas as pessoas que fizeram o Check-up, com as respostas de quem já respondeu.</p>
+      <div class="mem-panel" style="margin-bottom:18px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+          <input id="admin-checkup-name" type="text" placeholder="Nome da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="admin-checkup-email" type="email" placeholder="E-mail da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="btn btn-primary btn-sm" id="admin-checkup-add">Adicionar ao check-up</button>
+          <span id="admin-checkup-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+      </div>
       <div id="admin-checkup-list"><p class="card-text" style="color:var(--muted);">Carregando...</p></div>
     </div>
   </main>
@@ -703,14 +713,41 @@
           <div style="display:flex;gap:8px;align-items:center;">
             <span class="mli-tag" style="background:${p.liberado ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.liberado ? 'var(--marsala-deep)' : '#7A2222'};">${p.liberado ? 'Liberado' : 'Não liberado'}</span>
             <span class="mli-tag" style="background:${p.jaFezCheckup ? 'var(--rose-mist)' : '#eee'};color:${p.jaFezCheckup ? 'var(--marsala-deep)' : '#999'};">${p.jaFezCheckup ? 'Respondeu' : 'Pendente'}</span>
+            <button type="button" class="btn btn-outline btn-sm admin-checkup-access">${p.liberado ? 'Remover acesso' : 'Liberar acesso'}</button>
           </div>
         </div>
         ${respostasHtml}
         <a href="dashboard.html?as=${encodeURIComponent(p.email)}" class="btn btn-outline btn-sm" style="margin-top:12px;">Ver como paciente &nbsp;→</a>
       `;
+      const accessBtn = card.querySelector('.admin-checkup-access');
+      accessBtn.addEventListener('click', async ()=>{
+        if(p.liberado && !confirm('Remover o acesso ao check-up desta paciente? As respostas serão preservadas.')) return;
+        accessBtn.disabled = true;
+        const changed = await apiPost('adminSetCheckupAccess', { idToken: patientIdToken, email: p.email, liberado: !p.liberado });
+        if(changed.ok) loadAdminCheckupPatients(); else accessBtn.disabled = false;
+      });
       wrap.appendChild(card);
     });
     if(window.__rebindCursor) window.__rebindCursor();
+  }
+
+  const adminCheckupAddBtn = document.getElementById('admin-checkup-add');
+  if(adminCheckupAddBtn){
+    adminCheckupAddBtn.addEventListener('click', async ()=>{
+      const nome = document.getElementById('admin-checkup-name').value.trim();
+      const email = document.getElementById('admin-checkup-email').value.trim();
+      const status = document.getElementById('admin-checkup-status');
+      if(!nome || !email){ status.textContent = 'Informe nome e e-mail.'; return; }
+      adminCheckupAddBtn.disabled = true;
+      const res = await apiPost('adminAddCheckupPatient', { idToken: patientIdToken, nome, email });
+      adminCheckupAddBtn.disabled = false;
+      status.textContent = res.ok ? 'Acesso liberado ✓' : (res.error || 'Erro ao adicionar.');
+      if(res.ok){
+        document.getElementById('admin-checkup-name').value = '';
+        document.getElementById('admin-checkup-email').value = '';
+        loadAdminCheckupPatients();
+      }
+    });
   }
 
   /* ── VÍDEO DE BOAS-VINDAS: toca embutido na plataforma, sem ir pro YouTube ── */
