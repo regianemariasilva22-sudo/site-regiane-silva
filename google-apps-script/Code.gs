@@ -519,6 +519,10 @@ function patientEmailFromToken_(body) {
 }
 
 function normalizeTimes_(value) {
+  // A planilha converte horários únicos em Date; preserve o horário exibido.
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    value = Utilities.formatDate(value, NOTIFICATION_TIMEZONE, 'HH:mm');
+  }
   const times = String(value || '').split(/[;,\s]+/).map(function(v) { return v.trim(); }).filter(Boolean);
   const valid = [];
   times.forEach(function(v) {
