@@ -1247,6 +1247,14 @@ function actionAdminSetCheckupAccess(body) {
 
 // ── LINK NA BIO (biolink.html) ───────────────────────────
 
+/** Mantém dados enviados pelo público como texto literal na planilha.
+ * Evita que telefones com +55 ou textos iniciados por =, -, + ou @ virem fórmulas.
+ */
+function sheetLiteral_(value) {
+  const text = String(value || '');
+  return /^[=+\-@]/.test(text) ? "'" + text : text;
+}
+
 /**
  * Recebe os leads do link na bio e separa em duas abas: quem respondeu o
  * quiz de diagnóstico vai para BioLeadsQuiz, quem só deixou o e-mail na
@@ -1255,7 +1263,7 @@ function actionAdminSetCheckupAccess(body) {
 function actionBioLead(body) {
   if (body.tag === 'newsletter') {
     const sheet = getSheet('BioNewsletter');
-    sheet.appendRow([new Date(), body.nome || '', body.email || '']);
+    sheet.appendRow([new Date(), sheetLiteral_(body.nome), sheetLiteral_(body.email)]);
     notifyRegiane('Novo inscrito na newsletter do link na bio', 'Nome: ' + (body.nome || '-') + '\nE-mail: ' + (body.email || '-'));
     return { ok: true };
   }
@@ -1263,12 +1271,12 @@ function actionBioLead(body) {
   const sheet = getSheet('BioLeadsQuiz');
   sheet.appendRow([
     new Date(),
-    body.nome || '',
-    body.telefone || '',
-    body.pergunta1 || '',
-    body.pergunta2 || '',
-    body.textoLivre || '',
-    body.cursoSugerido || ''
+    sheetLiteral_(body.nome),
+    sheetLiteral_(body.telefone),
+    sheetLiteral_(body.pergunta1),
+    sheetLiteral_(body.pergunta2),
+    sheetLiteral_(body.textoLivre),
+    sheetLiteral_(body.cursoSugerido)
   ]);
 
   const quem = body.nome || body.telefone || 'alguém';
