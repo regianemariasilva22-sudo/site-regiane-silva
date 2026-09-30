@@ -94,12 +94,25 @@ function assertAdmin(idToken) {
   return auth;
 }
 
+function sendRegianeEmailStrict_(assunto, corpo) {
+  if (!REGIANE_NOTIFICATION_EMAIL || REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') !== -1) {
+    throw new Error('E-mail de notificação da Regiane não configurado.');
+  }
+  MailApp.sendEmail({
+    to: REGIANE_NOTIFICATION_EMAIL,
+    subject: assunto,
+    body: corpo,
+    name: 'Site Regiane Silva'
+  });
+}
+
 function notifyRegiane(assunto, corpo) {
-  if (!REGIANE_NOTIFICATION_EMAIL || REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') !== -1) return;
   try {
-    MailApp.sendEmail(REGIANE_NOTIFICATION_EMAIL, assunto, corpo);
+    sendRegianeEmailStrict_(assunto, corpo);
+    return true;
   } catch (err) {
     // não deixa o fluxo principal quebrar se o e-mail falhar
+    return false;
   }
 }
 
@@ -739,6 +752,7 @@ function processScheduledNotifications() {
         sentIds[id] = true;
       });
     });
+    processPendingBioLeadNotifications_();
   } finally {
     lock.releaseLock();
   }
@@ -1255,41 +1269,118 @@ function sheetLiteral_(value) {
   return /^[=+\-@]/.test(text) ? "'" + text : text;
 }
 
+function buildBioLeadNotification_(type, lead) {
+  if (type === 'newsletter') {
+    return {
+      subject: '[NOVO LEAD] Newsletter do link da bio — ' + (lead.Nome || lead.Email || 'novo contato'),
+      body: 'Um novo contato entrou pela newsletter do link da bio.\n\n' +
+        'Nome: ' + (lead.Nome || '-') + '\n' +
+        'E-mail: ' + (lead.Email || '-') + '\n\n' +
+        'Entre em contato com esse lead assim que possível.\n\n' +
+        'Planilha: https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit#gid=585346695'
+    };
+  }
+
+  return {
+    subject: '[NOVO LEAD] Quiz do link da bio — ' + (lead.Nome || lead.Telefone || 'novo contato'),
+    body: 'Uma nova pessoa respondeu ao quiz do link da bio.\n\n' +
+      'Nome: ' + (lead.Nome || '-') + '\n' +
+      'Telefone: ' + (lead.Telefone || '-') + '\n' +
+      'Momento: ' + (lead.Momento || '-') + '\n' +
+      'Sintoma: ' + (lead.Sintoma || '-') + '\n' +
+      'Mensagem: ' + (lead.Mensagem || '-') + '\n' +
+      'Recomendação sugerida: ' + (lead.RecomendacaoSugerida || '-') + '\n\n' +
+      'Entre em contato com esse lead assim que possível.\n\n' +
+      'Planilha: https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit#gid=818925408'
+  };
+}
+
+function trySendBioLeadNotification_(sheet, row, notification, sentCol, statusCol, attemptsCol) {
+  const attempts = Number(sheet.getRange(row, attemptsCol).getValue() || 0) + 1;
+  sheet.getRange(row, attemptsCol).setValue(attempts);
+  try {
+    sendRegianeEmailStrict_(notification.subject, notification.body);
+    sheet.getRange(row, sentCol, 1, 2).setValues([[new Date(), 'Enviado']]);
+    return { ok: true, attempts: attempts };
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err).slice(0, 300);
+    sheet.getRange(row, statusCol).setValue('Erro no envio: ' + message);
+    ensureNotificationTrigger_();
+    return { ok: false, attempts: attempts, error: message };
+  }
+}
+
+function processPendingBioLeadNotifications_() {
+  [
+    { name: 'BioLeadsQuiz', type: 'quiz' },
+    { name: 'BioNewsletter', type: 'newsletter' }
+  ].forEach(function(config) {
+    const sheet = getSheet(config.name);
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+    const headers = data[0];
+    const sentCol = headers.indexOf('AvisoEnviadoEm') + 1;
+    const statusCol = headers.indexOf('StatusAviso') + 1;
+    const attemptsCol = headers.indexOf('TentativasAviso') + 1;
+    if (!sentCol || !statusCol || !attemptsCol) return;
+
+    data.slice(1).forEach(function(values, index) {
+      const status = String(values[statusCol - 1] || '');
+      const attempts = Number(values[attemptsCol - 1] || 0);
+      if ((status !== 'Pendente' && status.indexOf('Erro no envio:') !== 0) || attempts >= 5) return;
+      const lead = {};
+      headers.forEach(function(header, col) { lead[header] = values[col]; });
+      const notification = buildBioLeadNotification_(config.type, lead);
+      trySendBioLeadNotification_(sheet, index + 2, notification, sentCol, statusCol, attemptsCol);
+    });
+  });
+}
+
 /**
  * Recebe os leads do link na bio e separa em duas abas: quem respondeu o
  * quiz de diagnóstico vai para BioLeadsQuiz, quem só deixou o e-mail na
  * newsletter vai para BioNewsletter. Nos dois casos avisa a Regiane.
  */
 function actionBioLead(body) {
-  if (body.tag === 'newsletter') {
-    const sheet = getSheet('BioNewsletter');
-    sheet.appendRow([new Date(), sheetLiteral_(body.nome), sheetLiteral_(body.email)]);
-    notifyRegiane('Novo inscrito na newsletter do link na bio', 'Nome: ' + (body.nome || '-') + '\nE-mail: ' + (body.email || '-'));
-    return { ok: true };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (body.tag === 'newsletter') {
+      const sheet = getSheet('BioNewsletter');
+      sheet.appendRow([new Date(), sheetLiteral_(body.nome), sheetLiteral_(body.email), '', 'Pendente', 0]);
+      const row = sheet.getLastRow();
+      const notification = buildBioLeadNotification_('newsletter', { Nome: body.nome, Email: body.email });
+      const delivery = trySendBioLeadNotification_(sheet, row, notification, 4, 5, 6);
+      return { ok: true, avisoEmailEnviado: delivery.ok };
+    }
+
+    const sheet = getSheet('BioLeadsQuiz');
+    sheet.appendRow([
+      new Date(),
+      sheetLiteral_(body.nome),
+      sheetLiteral_(body.telefone),
+      sheetLiteral_(body.pergunta1),
+      sheetLiteral_(body.pergunta2),
+      sheetLiteral_(body.textoLivre),
+      sheetLiteral_(body.cursoSugerido),
+      '',
+      'Pendente',
+      0
+    ]);
+    const row = sheet.getLastRow();
+    const notification = buildBioLeadNotification_('quiz', {
+      Nome: body.nome,
+      Telefone: body.telefone,
+      Momento: body.pergunta1,
+      Sintoma: body.pergunta2,
+      Mensagem: body.textoLivre,
+      RecomendacaoSugerida: body.cursoSugerido
+    });
+    const delivery = trySendBioLeadNotification_(sheet, row, notification, 8, 9, 10);
+    return { ok: true, avisoEmailEnviado: delivery.ok };
+  } finally {
+    lock.releaseLock();
   }
-
-  const sheet = getSheet('BioLeadsQuiz');
-  sheet.appendRow([
-    new Date(),
-    sheetLiteral_(body.nome),
-    sheetLiteral_(body.telefone),
-    sheetLiteral_(body.pergunta1),
-    sheetLiteral_(body.pergunta2),
-    sheetLiteral_(body.textoLivre),
-    sheetLiteral_(body.cursoSugerido)
-  ]);
-
-  const quem = body.nome || body.telefone || 'alguém';
-  let corpo = 'Novo diagnóstico respondido no link na bio.\n\nNome: ' + (body.nome || '-') +
-    '\nTelefone: ' + (body.telefone || '-');
-  if (body.pergunta1) corpo += '\nMomento: ' + body.pergunta1;
-  if (body.pergunta2) corpo += '\nSintoma: ' + body.pergunta2;
-  if (body.textoLivre) corpo += '\nMensagem: ' + body.textoLivre;
-  if (body.cursoSugerido) corpo += '\nRecomendação sugerida: ' + body.cursoSugerido;
-
-  notifyRegiane('Novo lead do link na bio — ' + quem, corpo);
-
-  return { ok: true };
 }
 
 // ── CONFIGURAÇÃO INICIAL DA PLANILHA (rode uma vez, na mão) ──────
@@ -1364,11 +1455,11 @@ function setupSheetStructure() {
     ['exemplo@checkup.com', 'Nome de Exemplo', new Date(), 'Sim', 'Não', '', '', '']);
 
   buildSheet('BioLeadsQuiz',
-    ['Data', 'Nome', 'Telefone', 'Momento', 'Sintoma', 'Mensagem', 'RecomendacaoSugerida'],
+    ['Data', 'Nome', 'Telefone', 'Momento', 'Sintoma', 'Mensagem', 'RecomendacaoSugerida', 'AvisoEnviadoEm', 'StatusAviso', 'TentativasAviso'],
     null);
 
   buildSheet('BioNewsletter',
-    ['Data', 'Nome', 'Email'],
+    ['Data', 'Nome', 'Email', 'AvisoEnviadoEm', 'StatusAviso', 'TentativasAviso'],
     null);
 
   // remove a aba padrão em branco, se existir e não for a única
