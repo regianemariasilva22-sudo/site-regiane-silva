@@ -55,6 +55,12 @@ function normEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function isValidPublicLink_(value) {
+  const link = String(value || '').trim();
+  const match = link.match(/^https?:\/\/([^/?#\s]+)(?:[/?#]\S*)?$/i);
+  return !!match && match[1].indexOf('.') > 0;
+}
+
 function sendPatientEmail_(to, subject, body) {
   const sender = normEmail(PATIENT_SENDER_EMAIL);
   const aliases = GmailApp.getAliases().map(normEmail);
@@ -231,7 +237,7 @@ function actionDashboard(email) {
 
   const materiais = sheetToObjects(getSheet('Materiais')).filter(m => {
     const dest = normEmail(m.Email);
-    return dest === normEmail(email) || dest === 'todos';
+    return (dest === normEmail(email) || dest === 'todos') && isValidPublicLink_(m.Link);
   });
 
   const pontosTotal = Number(p.PontosTotal) || 0;
@@ -479,6 +485,7 @@ function actionAdminAddMaterial(body) {
   const link = String(body.link || '').trim();
   const titulo = String(body.titulo || '').trim();
   if (!link || !titulo) return { ok: false, error: 'Preencha pelo menos o título e o link.' };
+  if (!isValidPublicLink_(link)) return { ok: false, error: 'Informe um link completo e válido, começando com https://.' };
 
   const areasValidas = ['aulas', 'rotulo', 'materiais'];
   const area = areasValidas.indexOf(body.area) !== -1 ? body.area : 'materiais';
@@ -694,6 +701,7 @@ function createImmediateNotification_(email, titulo, mensagem, routineId) {
   const id = 'imediata-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
   const now = new Date();
   sheets.notificacoes.appendRow([id, routineId || '', normEmail(email), titulo, mensagem, now, now, '', '', 'Enviada']);
+  const notificationRow = sheets.notificacoes.getLastRow();
   try {
     sendPatientEmail_(
       email,
@@ -701,8 +709,7 @@ function createImmediateNotification_(email, titulo, mensagem, routineId) {
       mensagem + '\n\nAcesse sua área de membros: https://regianemariasilva22-sudo.github.io/site-regiane-silva/membros/programa/login.html'
     );
   } catch (err) {
-    const row = sheets.notificacoes.getLastRow();
-    sheets.notificacoes.getRange(row, 10).setValue('Erro no e-mail: ' + String(err));
+    sheets.notificacoes.getRange(notificationRow, 10).setValue('Erro no e-mail: ' + String(err));
   }
   return id;
 }
