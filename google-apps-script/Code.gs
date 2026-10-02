@@ -56,10 +56,14 @@ function normEmail(email) {
 }
 
 function ensureHeaders_(sheet, headers) {
-  const current = sheet.getLastColumn() ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] : [];
+  const lastColumn = sheet.getLastColumn();
+  const current = lastColumn
+    ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    : [];
+  while (current.length && String(current[current.length - 1]).trim() === '') current.pop();
   headers.forEach(function(header) {
     if (current.indexOf(header) === -1) {
-      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      sheet.getRange(1, current.length + 1).setValue(header);
       current.push(header);
     }
   });
