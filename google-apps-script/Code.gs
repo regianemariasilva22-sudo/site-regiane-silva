@@ -55,6 +55,40 @@ function normEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function ensureHeaders_(sheet, headers) {
+  const current = sheet.getLastColumn() ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] : [];
+  headers.forEach(function(header) {
+    if (current.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      current.push(header);
+    }
+  });
+}
+
+function ensureGamificationSheets_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let comentarios = ss.getSheetByName('Comentarios');
+  if (!comentarios) comentarios = ss.insertSheet('Comentarios');
+  ensureHeaders_(comentarios, ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos']);
+
+  let pontos = ss.getSheetByName('PontosLog');
+  if (!pontos) pontos = ss.insertSheet('PontosLog');
+  ensureHeaders_(pontos, ['Id', 'Email', 'Tipo', 'Pontos', 'Data', 'ChaveUnica', 'SaldoDepois']);
+
+  let fotos = ss.getSheetByName('Fotos');
+  if (!fotos) fotos = ss.insertSheet('Fotos');
+  ensureHeaders_(fotos, ['Id', 'Email', 'Tipo', 'MessageId', 'AttachmentIndex', 'NomeArquivo', 'MimeType', 'Hash', 'DataHora', 'Pontos', 'Status']);
+
+  let creditos = ss.getSheetByName('Creditos');
+  if (!creditos) creditos = ss.insertSheet('Creditos');
+  ensureHeaders_(creditos, ['Id', 'Email', 'Tipo', 'Valor', 'Descricao', 'Data', 'AdminEmail']);
+
+  [comentarios, pontos, fotos, creditos].forEach(function(sheet) {
+    sheet.setFrozenRows(1);
+  });
+  return { comentarios: comentarios, pontos: pontos, fotos: fotos, creditos: creditos };
+}
+
 function isValidPublicLink_(value) {
   const link = String(value || '').trim();
   const match = link.match(/^https?:\/\/([^/?#\s]+)(?:[/?#]\S*)?$/i);
@@ -100,6 +134,18 @@ function assertAdmin(idToken) {
   return auth;
 }
 
+function patientEmailFromToken_(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const requested = normEmail(body.email || body.targetEmail);
+  if (requested && requested !== auth.email) {
+    if (!isAdmin(auth.email)) throw new Error('Você não pode acessar os dados de outra paciente.');
+    if (!findPatientRow(requested)) throw new Error('Paciente não encontrada.');
+    return requested;
+  }
+  if (!isAdmin(auth.email) && !findPatientRow(auth.email)) throw new Error('Paciente não encontrada.');
+  return requested || auth.email;
+}
+
 function sendRegianeEmailStrict_(assunto, corpo) {
   if (!REGIANE_NOTIFICATION_EMAIL || REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') !== -1) {
     throw new Error('E-mail de notificação da Regiane não configurado.');
@@ -129,7 +175,7 @@ function doGet(e) {
     const action = e.parameter.action;
     if (action === 'login') return jsonResponse(actionLogin(e.parameter.email));
     if (action === 'dashboard') return jsonResponse(actionDashboard(e.parameter.email));
-    if (action === 'comments') return jsonResponse(actionComments(e.parameter.postId));
+    if (action === 'comments') return jsonResponse(actionCommentsLegacy_(e.parameter.postId));
     if (action === 'slots') return jsonResponse(actionSlots());
     if (action === 'checkAccess') return jsonResponse(actionCheckAccess(e.parameter.email, e.parameter.area));
     if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(e.parameter.email));
@@ -143,6 +189,8 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
+    if (action === 'patientDashboard') return jsonResponse(actionPatientDashboard(body));
+    if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
     if (action === 'googleLoginPrograma') return jsonResponse(actionGoogleLoginPrograma(body));
@@ -151,12 +199,15 @@ function doPost(e) {
     if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
     if (action === 'uploadFoto') return jsonResponse(actionUploadFoto(body));
+    if (action === 'patientPhotos') return jsonResponse(actionPatientPhotos(body));
+    if (action === 'patientPhotoData') return jsonResponse(actionPatientPhotoData(body));
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminAddPatient') return jsonResponse(actionAdminAddPatient(body));
     if (action === 'adminRemovePatient') return jsonResponse(actionAdminRemovePatient(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
+    if (action === 'adminUseCredit') return jsonResponse(actionAdminUseCredit(body));
     if (action === 'adminListRoutines') return jsonResponse(actionAdminListRoutines(body));
     if (action === 'adminSaveRoutine') return jsonResponse(actionAdminSaveRoutine(body));
     if (action === 'adminDeleteRoutine') return jsonResponse(actionAdminDeleteRoutine(body));
@@ -240,8 +291,14 @@ function actionDashboard(email) {
     return (dest === normEmail(email) || dest === 'todos') && isValidPublicLink_(m.Link);
   });
 
+  ensureGamificationSheets_();
   const pontosTotal = Number(p.PontosTotal) || 0;
-  const totalInteracoes = sheetToObjects(getSheet('PontosLog')).filter(l => normEmail(l.Email) === normEmail(email)).length;
+  const pontosLog = sheetToObjects(getSheet('PontosLog')).filter(function(l) { return normEmail(l.Email) === normEmail(email); });
+  const totalInteracoes = pontosLog.filter(function(l) {
+    const tipo = String(l.Tipo || '').toLowerCase();
+    return tipo.indexOf('comentário') === 0 || tipo.indexOf('foto') === 0;
+  }).length;
+  const credito = creditSummary_(email, pontosTotal);
 
   // próxima solicitação/consulta desta paciente (a mais próxima no futuro)
   const meusAgendamentos = sheetToObjects(getSheet('Agendamentos'))
@@ -265,12 +322,20 @@ function actionDashboard(email) {
     agendamentoHora: proximoAgendamento ? proximoAgendamento.Hora : '',
     pontosTotal: pontosTotal,
     totalInteracoes: totalInteracoes,
-    creditoDisponivel: Math.floor(pontosTotal / 100) * 10,
+    creditoGerado: credito.gerado,
+    creditoUsado: credito.usado,
+    creditoDisponivel: credito.disponivel,
+    creditoHistorico: credito.historico,
     faltamParaProximoCredito: 100 - (pontosTotal % 100),
     materiais: materiais.map(m => ({
       tipo: m.Tipo, titulo: m.Titulo, descricao: m.Descricao, link: m.Link, area: m.Area || 'materiais'
     }))
   };
+}
+
+function actionPatientDashboard(body) {
+  const email = patientEmailFromToken_(body);
+  return actionDashboard(email);
 }
 
 /**
@@ -279,10 +344,13 @@ function actionDashboard(email) {
  * contador ReceitasSalvas automaticamente, sem a Regiane precisar mexer.
  */
 function actionSaveRecipe(body) {
-  const email = normEmail(body.email);
+  const email = patientEmailFromToken_(body);
   const recipeId = String(body.recipeId || '').trim();
   if (!recipeId) return { ok: false, error: 'Receita inválida.' };
 
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
   const sheet = getSheet('Pacientes');
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
@@ -300,11 +368,14 @@ function actionSaveRecipe(body) {
       const novoTotal = (Number(data[i][receitasCol]) || 0) + 1;
       sheet.getRange(i + 1, receitasCol + 1).setValue(novoTotal);
       sheet.getRange(i + 1, idsCol + 1).setValue(idsAtuais.join(','));
-      addPoints(email, 'Receita salva: ' + (body.recipeTitle || recipeId), 2);
+      addPointsUnlocked_(email, 'Receita salva: ' + (body.recipeTitle || recipeId), 2, 'receita:' + email + ':' + recipeId);
       return { ok: true, jaSalva: false, receitasSalvas: novoTotal };
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -314,31 +385,48 @@ function actionSaveRecipe(body) {
  * depender da autorização de Drive, que trava a implantação existente.
  */
 function actionUploadFoto(body) {
-  const email = normEmail(body.email);
+  const email = patientEmailFromToken_(body);
   const p = findPatientRow(email);
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
   if (!body.fileBase64) return { ok: false, error: 'Nenhuma foto enviada.' };
 
+  const mimeType = String(body.mimeType || 'image/jpeg').toLowerCase();
+  if (mimeType.indexOf('image/') !== 0) return { ok: false, error: 'Envie somente uma imagem.' };
   const bytes = Utilities.base64Decode(body.fileBase64);
-  const blob = Utilities.newBlob(bytes, body.mimeType || 'image/jpeg', body.fileName || 'foto.jpg');
+  if (bytes.length > 8 * 1024 * 1024) return { ok: false, error: 'A imagem deve ter no máximo 8 MB.' };
+  const blob = Utilities.newBlob(bytes, mimeType, body.fileName || 'foto.jpg');
 
   const tipo = body.tipo === 'prato' ? 'Foto do prato' : 'Foto de resultado';
-  addPoints(email, tipo, 5);
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
+    .map(function(b) { return ('0' + ((b < 0 ? b + 256 : b).toString(16))).slice(-2); }).join('');
+  const sheets = ensureGamificationSheets_();
+  const existente = sheetToObjects(sheets.fotos).find(function(f) { return normEmail(f.Email) === email && String(f.Hash) === hash; });
+  if (existente) return { ok: true, duplicada: true, pontosAdicionados: 0, error: 'Esta foto já foi enviada anteriormente.' };
 
-  if (REGIANE_NOTIFICATION_EMAIL && REGIANE_NOTIFICATION_EMAIL.indexOf('COLE_AQUI') === -1) {
-    try {
-      MailApp.sendEmail({
-        to: REGIANE_NOTIFICATION_EMAIL,
-        subject: 'Nova ' + tipo.toLowerCase() + ' — ' + (p.Nome || email),
-        body: (p.Nome || email) + ' (' + email + ') enviou uma ' + tipo.toLowerCase() + '. Confira em anexo.',
-        attachments: [blob]
-      });
-    } catch (err) {
-      // não deixa o fluxo principal quebrar se o e-mail falhar
-    }
+  const fotosHoje = sheetToObjects(sheets.fotos).filter(function(f) {
+    return normEmail(f.Email) === email && sameLocalDay_(f.DataHora, new Date());
+  }).length;
+  if (fotosHoje >= 5) return { ok: false, error: 'Limite diário de 5 fotos atingido. Tente novamente amanhã.' };
+
+  const sender = normEmail(PATIENT_SENDER_EMAIL);
+  if (GmailApp.getAliases().map(normEmail).indexOf(sender) === -1) throw new Error('O endereço da Regiane não está autorizado como remetente no Gmail.');
+  const sent = GmailApp.createDraft(
+    REGIANE_NOTIFICATION_EMAIL,
+    'Nova ' + tipo.toLowerCase() + ' — ' + (p.Nome || email),
+    (p.Nome || email) + ' (' + email + ') enviou uma ' + tipo.toLowerCase() + '. A foto também está disponível no painel da paciente.',
+    { from: sender, name: PATIENT_SENDER_NAME, replyTo: sender, attachments: [blob] }
+  ).send();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const id = 'foto-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+    sheets.fotos.appendRow([id, email, tipo, sent.getId(), 0, blob.getName(), mimeType, hash, new Date(), 5, 'Enviada']);
+    addPointsUnlocked_(email, tipo, 5, 'foto:' + email + ':' + hash);
+    return { ok: true, id: id, duplicada: false, pontosAdicionados: 5 };
+  } finally {
+    lock.releaseLock();
   }
-
-  return { ok: true };
 }
 
 /**
@@ -365,22 +453,79 @@ function actionCheckAccess(email, area) {
  */
 function actionAdminListPatients(body) {
   assertAdmin(body.idToken);
+  ensureGamificationSheets_();
   const pacientes = sheetToObjects(getSheet('Pacientes'));
   return {
     ok: true,
-    pacientes: pacientes.map(p => ({
-      email: p.Email,
-      nome: p.Nome,
-      diasAcompanhamento: daysSince(p.DataInicio),
-      retornosRealizados: Number(p.RetornosRealizados) || 0,
-      receitasSalvas: Number(p.ReceitasSalvas) || 0,
-      pontosTotal: Number(p.PontosTotal) || 0,
-      progressoPercent: Number(p.ProgressoPercent) || 0,
-      temPlano: !!(p.PlanoTexto && String(p.PlanoTexto).trim()),
-      planoTexto: p.PlanoTexto || '',
-      planoPdfUrl: p.PlanoPdfUrl || ''
-    }))
+    pacientes: pacientes.map(function(p) {
+      const pontosTotal = Number(p.PontosTotal) || 0;
+      const credito = creditSummary_(p.Email, pontosTotal);
+      const fotos = sheetToObjects(getSheet('Fotos')).filter(function(f) { return normEmail(f.Email) === normEmail(p.Email); }).length;
+      return {
+        email: p.Email,
+        nome: p.Nome,
+        diasAcompanhamento: daysSince(p.DataInicio),
+        retornosRealizados: Number(p.RetornosRealizados) || 0,
+        receitasSalvas: Number(p.ReceitasSalvas) || 0,
+        pontosTotal: pontosTotal,
+        creditoGerado: credito.gerado,
+        creditoUsado: credito.usado,
+        creditoDisponivel: credito.disponivel,
+        creditoHistorico: credito.historico,
+        fotosTotal: fotos,
+        progressoPercent: Number(p.ProgressoPercent) || 0,
+        temPlano: !!(p.PlanoTexto && String(p.PlanoTexto).trim()),
+        planoTexto: p.PlanoTexto || '',
+        planoPdfUrl: p.PlanoPdfUrl || ''
+      };
+    })
   };
+}
+
+function creditSummary_(email, pontosTotal) {
+  ensureGamificationSheets_();
+  const historico = sheetToObjects(getSheet('Creditos')).filter(function(c) { return normEmail(c.Email) === normEmail(email); })
+    .sort(function(a, b) { return new Date(b.Data) - new Date(a.Data); });
+  let usado = 0;
+  historico.forEach(function(c) {
+    const valor = Math.abs(Number(c.Valor) || 0);
+    const tipo = String(c.Tipo || 'Uso').trim().toLowerCase();
+    if (tipo === 'estorno') usado -= valor;
+    else if (tipo === 'uso') usado += valor;
+  });
+  usado = Math.max(0, usado);
+  const gerado = Math.floor((Number(pontosTotal) || 0) / 100) * 10;
+  return {
+    gerado: gerado,
+    usado: usado,
+    disponivel: Math.max(0, gerado - usado),
+    historico: historico.slice(0, 20).map(function(c) {
+      return { id: String(c.Id), tipo: c.Tipo || 'Uso', valor: Number(c.Valor) || 0, descricao: c.Descricao || '', data: c.Data || '' };
+    })
+  };
+}
+
+function actionAdminUseCredit(body) {
+  const admin = assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const paciente = findPatientRow(email);
+  if (!paciente) return { ok: false, error: 'Paciente não encontrada.' };
+  const valor = Number(String(body.valor || '').replace(',', '.'));
+  if (!isFinite(valor) || valor <= 0) return { ok: false, error: 'Informe um valor de crédito maior que zero.' };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const resumo = creditSummary_(email, Number(paciente.PontosTotal) || 0);
+    if (valor > resumo.disponivel) return { ok: false, error: 'Crédito insuficiente. Disponível: R$ ' + resumo.disponivel.toFixed(2).replace('.', ',') };
+    const sheet = ensureGamificationSheets_().creditos;
+    const id = 'credito-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+    sheet.appendRow([id, email, 'Uso', valor, String(body.descricao || 'Crédito utilizado').trim(), new Date(), admin.email]);
+    const atualizado = creditSummary_(email, Number(paciente.PontosTotal) || 0);
+    return { ok: true, creditoGerado: atualizado.gerado, creditoUsado: atualizado.usado, creditoDisponivel: atualizado.disponivel };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function actionAdminAddPatient(body) {
@@ -526,16 +671,6 @@ function routineObjects_() {
 
 function notificationObjects_() {
   return sheetToObjects(ensureNotificationSheets_().notificacoes);
-}
-
-function patientEmailFromToken_(body) {
-  const auth = verifyGoogleToken(body.idToken);
-  const requested = normEmail(body.email || body.targetEmail);
-  if (requested && requested !== auth.email) {
-    if (!isAdmin(auth.email)) throw new Error('Você não pode acessar as orientações de outra paciente.');
-    return requested;
-  }
-  return auth.email;
 }
 
 function normalizeTimes_(value) {
@@ -802,35 +937,82 @@ function testarNotificacoesBabados() {
   };
 }
 
-// ── COMUNIDADE / COMENTÁRIOS ────────────────────────────
+// ── COMUNIDADE / COMENTÁRIOS / FOTOS / PONTOS ──────────
 
-function actionComments(postId) {
-  const all = sheetToObjects(getSheet('Comentarios'));
+function sameLocalDay_(a, b) {
+  const da = a instanceof Date ? a : new Date(a);
+  const db = b instanceof Date ? b : new Date(b);
+  if (isNaN(da.getTime()) || isNaN(db.getTime())) return false;
+  return Utilities.formatDate(da, NOTIFICATION_TIMEZONE, 'yyyyMMdd') === Utilities.formatDate(db, NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+}
+
+function actionComments(body) {
+  patientEmailFromToken_(body);
+  const postId = body.postId;
+  const all = sheetToObjects(ensureGamificationSheets_().comentarios);
   const filtered = postId ? all.filter(c => String(c.PostId) === String(postId)) : all;
   return {
     ok: true,
-    comments: filtered.map(c => ({ nome: c.Nome, texto: c.Texto, dataHora: c.DataHora }))
+    comments: filtered.map(c => ({ id: String(c.Id), nome: c.Nome, texto: c.Texto, dataHora: c.DataHora }))
   };
 }
 
-function actionAddComment(body) {
-  const email = normEmail(body.email);
-  const p = findPatientRow(email);
-  if (!p) return { ok: false, error: 'Paciente não encontrada.' };
-  if (!body.texto || !String(body.texto).trim()) return { ok: false, error: 'Comentário vazio.' };
-
-  const sheet = getSheet('Comentarios');
-  const id = new Date().getTime();
-  sheet.appendRow([id, body.postId, email, p.Nome, body.texto, new Date()]);
-
-  addPoints(email, 'Comentário na comunidade', 3);
-
-  return { ok: true, nome: p.Nome };
+function actionCommentsLegacy_(postId) {
+  const all = sheetToObjects(ensureGamificationSheets_().comentarios);
+  const filtered = postId ? all.filter(function(c) { return String(c.PostId) === String(postId); }) : all;
+  return { ok: true, comments: filtered.map(function(c) { return { nome: c.Nome, texto: c.Texto, dataHora: c.DataHora }; }) };
 }
 
-function addPoints(email, tipo, pontos) {
-  getSheet('PontosLog').appendRow([new Date().getTime(), email, tipo, pontos, new Date()]);
+function actionAddComment(body) {
+  const email = patientEmailFromToken_(body);
+  const p = findPatientRow(email);
+  if (!p) return { ok: false, error: 'Paciente não encontrada.' };
+  const texto = String(body.texto || '').trim();
+  if (!texto) return { ok: false, error: 'Comentário vazio.' };
+  if (texto.length > 1000) return { ok: false, error: 'O comentário deve ter no máximo 1.000 caracteres.' };
 
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let id;
+  let pontosConcedidos = 0;
+  let row;
+  try {
+    const sheets = ensureGamificationSheets_();
+    const anteriores = sheetToObjects(sheets.comentarios).filter(function(c) { return normEmail(c.Email) === email; });
+    const duplicadoRecente = anteriores.some(function(c) {
+      const quando = new Date(c.DataHora);
+      return String(c.PostId) === String(body.postId) && String(c.Texto || '').trim().toLowerCase() === texto.toLowerCase() &&
+        !isNaN(quando.getTime()) && (new Date().getTime() - quando.getTime()) < 24 * 60 * 60 * 1000;
+    });
+    const comentariosHoje = anteriores.filter(function(c) { return sameLocalDay_(c.DataHora, new Date()) && Number(c.PontosConcedidos) > 0; }).length;
+
+    id = 'comentario-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+    pontosConcedidos = (!duplicadoRecente && comentariosHoje < 10) ? 3 : 0;
+    sheets.comentarios.appendRow([id, body.postId, email, p.Nome, texto, new Date(), '', 'Pendente', pontosConcedidos]);
+    row = sheets.comentarios.getLastRow();
+    if (pontosConcedidos) addPointsUnlocked_(email, 'Comentário na comunidade', pontosConcedidos, id);
+  } finally {
+    lock.releaseLock();
+  }
+
+  const enviado = notifyRegiane(
+    'Novo comentário ou dúvida — ' + (p.Nome || email),
+    (p.Nome || email) + ' (' + email + ') escreveu na comunidade:\n\n' + texto + '\n\nAcesse o painel da área de membros para acompanhar.'
+  );
+  const comentarios = ensureGamificationSheets_().comentarios;
+  comentarios.getRange(row, 7).setValue(enviado ? new Date() : '');
+  comentarios.getRange(row, 8).setValue(enviado ? 'Enviado' : 'Erro no envio');
+
+  return { ok: true, id: id, nome: p.Nome, pontosAdicionados: pontosConcedidos, avisoRegianeEnviado: enviado };
+}
+
+function addPointsUnlocked_(email, tipo, pontos, chaveUnica) {
+  const sheets = ensureGamificationSheets_();
+  const key = String(chaveUnica || '').trim();
+  if (key) {
+    const already = sheetToObjects(sheets.pontos).some(function(l) { return String(l.ChaveUnica || '') === key; });
+    if (already) return { added: false, total: null };
+  }
   const pSheet = getSheet('Pacientes');
   const data = pSheet.getDataRange().getValues();
   const headers = data[0];
@@ -839,10 +1021,50 @@ function addPoints(email, tipo, pontos) {
   for (let i = 1; i < data.length; i++) {
     if (normEmail(data[i][emailCol]) === normEmail(email)) {
       const atual = Number(data[i][pontosCol]) || 0;
-      pSheet.getRange(i + 1, pontosCol + 1).setValue(atual + pontos);
-      break;
+      const novoTotal = atual + Number(pontos || 0);
+      pSheet.getRange(i + 1, pontosCol + 1).setValue(novoTotal);
+      sheets.pontos.appendRow([new Date().getTime(), normEmail(email), tipo, Number(pontos) || 0, new Date(), key, novoTotal]);
+      return { added: true, total: novoTotal };
     }
   }
+  return { added: false, total: null };
+}
+
+function addPoints(email, tipo, pontos, chaveUnica) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    return addPointsUnlocked_(email, tipo, pontos, chaveUnica);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function actionPatientPhotos(body) {
+  const email = patientEmailFromToken_(body);
+  const fotos = sheetToObjects(ensureGamificationSheets_().fotos)
+    .filter(function(f) { return normEmail(f.Email) === email; })
+    .sort(function(a, b) { return new Date(b.DataHora) - new Date(a.DataHora); })
+    .slice(0, 50)
+    .map(function(f) {
+      return { id: String(f.Id), tipo: f.Tipo || 'Foto', nomeArquivo: f.NomeArquivo || 'foto', mimeType: f.MimeType || 'image/jpeg', dataHora: f.DataHora || '', pontos: Number(f.Pontos) || 0 };
+    });
+  return { ok: true, email: email, fotos: fotos };
+}
+
+function actionPatientPhotoData(body) {
+  const email = patientEmailFromToken_(body);
+  const foto = sheetToObjects(ensureGamificationSheets_().fotos).find(function(f) {
+    return String(f.Id) === String(body.id) && normEmail(f.Email) === email;
+  });
+  if (!foto) return { ok: false, error: 'Foto não encontrada.' };
+  const message = GmailApp.getMessageById(String(foto.MessageId || ''));
+  if (!message) return { ok: false, error: 'O arquivo da foto não está mais disponível.' };
+  const attachments = message.getAttachments({ includeInlineImages: false, includeAttachments: true });
+  const index = Number(foto.AttachmentIndex) || 0;
+  if (!attachments[index]) return { ok: false, error: 'O anexo da foto não foi encontrado.' };
+  const blob = attachments[index];
+  return { ok: true, id: String(foto.Id), mimeType: blob.getContentType(), fileBase64: Utilities.base64Encode(blob.getBytes()) };
 }
 
 // ── AGENDA (conectada de verdade ao Google Agenda da Regiane) ────
@@ -1443,9 +1665,13 @@ function setupSheetStructure() {
     ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'],
     [1, 'TODOS', 'PDF', 'Planner alimentar semanal', 'Vale para todas as pacientes do Programa', 'https://', 'materiais']);
 
-  buildSheet('Comentarios', ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora'], null);
+  buildSheet('Comentarios', ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos'], null);
 
-  buildSheet('PontosLog', ['Id', 'Email', 'Tipo', 'Pontos', 'Data'], null);
+  buildSheet('PontosLog', ['Id', 'Email', 'Tipo', 'Pontos', 'Data', 'ChaveUnica', 'SaldoDepois'], null);
+
+  buildSheet('Fotos', ['Id', 'Email', 'Tipo', 'MessageId', 'AttachmentIndex', 'NomeArquivo', 'MimeType', 'Hash', 'DataHora', 'Pontos', 'Status'], null);
+
+  buildSheet('Creditos', ['Id', 'Email', 'Tipo', 'Valor', 'Descricao', 'Data', 'AdminEmail'], null);
 
   buildSheet('Agendamentos', ['Email', 'Data', 'Hora', 'Status', 'DataSolicitacao', 'Nome', 'IsoInicio'], null);
 
@@ -1476,7 +1702,7 @@ function setupSheetStructure() {
   });
 
   // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
-  const ordem = ['Pacientes', 'CheckupPacientes', 'Rotinas', 'Notificacoes', 'Materiais', 'Agendamentos', 'Comentarios', 'PontosLog', 'BioLeadsQuiz', 'BioNewsletter'];
+  const ordem = ['Pacientes', 'CheckupPacientes', 'Rotinas', 'Notificacoes', 'Materiais', 'Agendamentos', 'Comentarios', 'Fotos', 'PontosLog', 'Creditos', 'BioLeadsQuiz', 'BioNewsletter'];
   ordem.forEach((nome, i) => {
     const s = ss.getSheetByName(nome);
     if (s) ss.setActiveSheet(s);

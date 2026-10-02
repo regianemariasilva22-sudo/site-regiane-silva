@@ -255,8 +255,16 @@
           <h3>Meta do próximo crédito</h3>
           <p class="card-text">Faltam <strong id="pontos-faltam">60 pontos</strong> para o seu próximo crédito de R$10.</p>
           <div class="mem-progress-bar" style="margin-top:14px;"><div class="mem-progress-fill" id="pontos-bar" style="width:85%;"></div></div>
+          <p class="card-text" style="margin-top:14px;">Crédito gerado: <strong id="pontos-credito-gerado">R$ 0</strong> · já utilizado: <strong id="pontos-credito-usado">R$ 0</strong></p>
         </div>
       </div>
+
+      <h3 style="margin-top:34px;margin-bottom:16px;">Minhas fotos enviadas</h3>
+      <p class="card-text" style="margin-bottom:14px;">Suas fotos ficam privadas e podem ser vistas somente por você e pelas administradoras do acompanhamento.</p>
+      <div id="patient-photos-grid" class="identify-grid"><p class="card-text" style="color:var(--muted);">Carregando fotos...</p></div>
+
+      <h3 style="margin-top:34px;margin-bottom:16px;">Histórico de créditos</h3>
+      <div id="patient-credit-history" class="mem-panel"><p class="card-text" style="color:var(--muted);">Nenhum crédito utilizado ainda.</p></div>
     </div>
 
     <!-- RAIO-X DO RÓTULO TAB -->
@@ -310,7 +318,7 @@
           <div class="feed-comment"><div class="fc-avatar"></div><div><span class="fc-name">Regiane</span><span class="fc-text">Que orgulho, Marta! Continue assim 💗</span></div></div>
         </div>
         <div class="feed-input-row">
-          <input type="text" placeholder="Escreva um comentário..." id="feed-input-1" />
+          <input type="text" maxlength="1000" placeholder="Escreva um comentário ou uma dúvida..." id="feed-input-1" />
           <button type="button" onclick="postComment(1)">Enviar</button>
         </div>
       </div>
@@ -324,12 +332,12 @@
         <div class="feed-photo"></div>
         <div class="feed-comments" id="feed-comments-2"></div>
         <div class="feed-input-row">
-          <input type="text" placeholder="Escreva um comentário..." id="feed-input-2" />
+          <input type="text" maxlength="1000" placeholder="Escreva um comentário ou uma dúvida..." id="feed-input-2" />
           <button type="button" onclick="postComment(2)">Enviar</button>
         </div>
       </div>
 
-      <p style="font-size:12px;color:var(--muted);margin-top:8px;">✦ Protótipo de visualização — os comentários daqui ainda não são salvos permanentemente.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;">✦ Comentários e dúvidas são salvos no acompanhamento e avisados à Regiane. Interações válidas rendem pontos conforme as regras da plataforma.</p>
     </div>
 
     <!-- MATERIAIS TAB -->
@@ -543,6 +551,7 @@
     if(typeof event !== 'undefined' && event.currentTarget) event.currentTarget.classList.add('active');
     if(window.__rebindCursor) window.__rebindCursor();
     if(name==='comunidade') loadComments();
+    if(name==='pontos') loadPatientPhotos();
     if(name==='calendario') loadSlots();
     if(name==='notificacoes') loadRoutineData();
     if(name==='admin'){ loadAdminBookings(); loadAdminPatients(); }
@@ -556,8 +565,8 @@
 
   /* ── DASHBOARD: dados reais da paciente ── */
   async function loadDashboardData(){
-    if(!apiConfigured() || !patientEmail) return;
-    const d = await apiGet('dashboard', { email: patientEmail });
+    if(!apiConfigured() || !patientEmail || !patientIdToken) return;
+    const d = await apiPost('patientDashboard', { idToken: patientIdToken, email: patientEmail });
     if(!d.ok) return;
 
     if(d.nome) document.getElementById('hello-title').textContent = 'Olá, ' + d.nome.split(' ')[0] + ' 🌿';
@@ -592,8 +601,27 @@
     document.getElementById('pontos-total').textContent = d.pontosTotal;
     document.getElementById('pontos-comentarios').textContent = d.totalInteracoes;
     document.getElementById('pontos-credito').textContent = 'R$ ' + d.creditoDisponivel;
+    document.getElementById('pontos-credito-gerado').textContent = 'R$ ' + d.creditoGerado;
+    document.getElementById('pontos-credito-usado').textContent = 'R$ ' + d.creditoUsado;
     document.getElementById('pontos-faltam').textContent = d.faltamParaProximoCredito + ' pontos';
     document.getElementById('pontos-bar').style.width = (100 - d.faltamParaProximoCredito) + '%';
+
+    const creditHistory = document.getElementById('patient-credit-history');
+    if(creditHistory){
+      creditHistory.innerHTML = '';
+      if(!d.creditoHistorico || !d.creditoHistorico.length){
+        creditHistory.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhum crédito utilizado ainda.</p>';
+      } else {
+        d.creditoHistorico.forEach(c=>{
+          const item = document.createElement('div');
+          item.className = 'mem-list-item';
+          item.innerHTML = '<div class="mli-icon">💳</div><div><div class="mli-title"></div><div class="mli-sub"></div></div>';
+          item.querySelector('.mli-title').textContent = c.tipo + ' · R$ ' + Number(c.valor || 0).toFixed(2).replace('.', ',');
+          item.querySelector('.mli-sub').textContent = (c.descricao || '') + (c.data ? ' · ' + new Date(c.data).toLocaleString('pt-BR') : '');
+          creditHistory.appendChild(item);
+        });
+      }
+    }
 
     if(d.planoTexto) document.getElementById('plano-texto').textContent = d.planoTexto;
     if(d.planoPdfUrl){
@@ -764,16 +792,17 @@
     if(e.target.id === 'video-modal') closeVideoModal();
   });
 
-  /* ── COMUNIDADE: comentários reais via API (com fallback local de demonstração) ── */
+  /* ── COMUNIDADE: comentários autenticados e persistentes ── */
   async function loadComments(){
-    if(!apiConfigured()) return;
+    if(!apiConfigured() || !patientIdToken) return;
     for(const id of [1,2]){
-      const res = await apiGet('comments', { postId: id });
+      const res = await apiPost('patientComments', { idToken: patientIdToken, email: patientEmail, postId: id });
       if(!res.ok) continue;
       const wrap = document.getElementById('feed-comments-'+id);
+      wrap.querySelectorAll('.api-comment').forEach(el=>el.remove());
       res.comments.forEach(c=>{
         const el = document.createElement('div');
-        el.className = 'feed-comment';
+        el.className = 'feed-comment api-comment';
         el.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
         el.querySelector('.fc-name').textContent = c.nome;
         el.querySelector('.fc-text').textContent = c.texto;
@@ -789,28 +818,24 @@
     if(!text) return;
     const wrap = document.getElementById('feed-comments-'+id);
 
-    if(apiConfigured() && patientEmail){
-      const res = await apiPost('comment', { email: patientEmail, postId: id, texto: text });
+    if(isImpersonating){ alert('No modo “Ver como paciente”, a administradora pode visualizar, mas não publicar em nome da paciente.'); return; }
+    if(apiConfigured() && patientEmail && patientIdToken){
+      const res = await apiPost('comment', { idToken: patientIdToken, email: patientEmail, postId: id, texto: text });
       if(!res.ok){ alert(res.error || 'Não foi possível enviar o comentário.'); return; }
       const c = document.createElement('div');
-      c.className = 'feed-comment';
+      c.className = 'feed-comment api-comment';
       c.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
       c.querySelector('.fc-name').textContent = res.nome || 'Você';
       c.querySelector('.fc-text').textContent = text;
       wrap.appendChild(c);
       input.value = '';
+      if(res.pontosAdicionados) loadDashboardData();
+      else alert('Comentário salvo. Esta interação não gerou pontos porque era repetida ou o limite diário foi atingido.');
       if(window.__rebindCursor) window.__rebindCursor();
       return;
     }
 
-    // Modo demonstração (sem backend publicado ainda): não é salvo de verdade.
-    const c = document.createElement('div');
-    c.className = 'feed-comment';
-    c.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name">Você</span><span class="fc-text"></span></div>`;
-    c.querySelector('.fc-text').textContent = text;
-    wrap.appendChild(c);
-    input.value = '';
-    if(window.__rebindCursor) window.__rebindCursor();
+    alert('Faça login novamente para comentar.');
   }
 
   /* ── CALENDÁRIO: horários reais via API ── */
@@ -859,7 +884,8 @@
       if(!apiConfigured()){ btn.textContent = 'Salva ✓'; btn.disabled = true; return; }
       btn.disabled = true;
       btn.textContent = 'Salvando...';
-      const res = await apiPost('saveRecipe', { email: patientEmail, recipeId: recipeId, recipeTitle: recipeTitle });
+      if(isImpersonating){ alert('No modo “Ver como paciente”, receitas não são salvas em nome dela.'); btn.disabled = false; btn.textContent = 'Salvar receita'; return; }
+      const res = await apiPost('saveRecipe', { idToken: patientIdToken, email: patientEmail, recipeId: recipeId, recipeTitle: recipeTitle });
       if(res.ok){
         btn.textContent = 'Salva ✓';
         document.getElementById('stat-receitas').textContent = res.receitasSalvas;
@@ -876,7 +902,10 @@
     const btn = document.getElementById(btnId);
     const input = document.getElementById(inputId);
     if(!btn || !input) return;
-    btn.addEventListener('click', ()=> input.click());
+    btn.addEventListener('click', ()=>{
+      if(isImpersonating){ alert('No modo “Ver como paciente”, você pode visualizar as fotos, mas não enviar em nome dela.'); return; }
+      input.click();
+    });
     input.addEventListener('change', async ()=>{
       const file = input.files[0];
       if(!file) return;
@@ -887,12 +916,15 @@
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result.split(',')[1];
-        const r = await apiPost('uploadFoto', { email: patientEmail, tipo: tipo, fileBase64: base64, fileName: file.name, mimeType: file.type });
+        const r = await apiPost('uploadFoto', { idToken: patientIdToken, email: patientEmail, tipo: tipo, fileBase64: base64, fileName: file.name, mimeType: file.type });
         btn.disabled = false;
         input.value = '';
-        if(r.ok){
+        if(r.ok && !r.duplicada){
           status.textContent = 'Foto enviada — +5 pontos ✓';
           loadDashboardData();
+          loadPatientPhotos();
+        } else if(r.ok && r.duplicada){
+          status.textContent = 'Esta foto já havia sido enviada — nenhum ponto adicional.';
         } else {
           status.textContent = r.error || 'Não foi possível enviar a foto.';
         }
@@ -902,6 +934,36 @@
   }
   wireFotoUpload('foto-resultado-btn', 'foto-resultado-input', 'resultado');
   wireFotoUpload('foto-prato-btn', 'foto-prato-input', 'prato');
+
+  async function loadPatientPhotos(){
+    const wrap = document.getElementById('patient-photos-grid');
+    if(!wrap || !apiConfigured() || !patientIdToken || !patientEmail) return;
+    wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Carregando fotos...</p>';
+    const res = await apiPost('patientPhotos', { idToken: patientIdToken, email: patientEmail });
+    if(!res.ok){ wrap.innerHTML = '<p class="card-text">' + (res.error || 'Não foi possível carregar as fotos.') + '</p>'; return; }
+    if(!res.fotos.length){ wrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma foto enviada ainda.</p>'; return; }
+    wrap.innerHTML = '';
+    for(const foto of res.fotos){
+      const card = document.createElement('div');
+      card.className = 'glass-card';
+      card.innerHTML = '<div class="patient-photo-preview" style="height:220px;border-radius:12px;background:var(--rose-mist);display:flex;align-items:center;justify-content:center;overflow:hidden;"><span>Carregando imagem...</span></div><div class="card-title" style="margin-top:10px;"></div><p class="card-text"></p>';
+      card.querySelector('.card-title').textContent = foto.tipo;
+      card.querySelector('.card-text').textContent = (foto.dataHora ? new Date(foto.dataHora).toLocaleString('pt-BR') : '') + ' · +' + foto.pontos + ' pontos';
+      wrap.appendChild(card);
+      const imageRes = await apiPost('patientPhotoData', { idToken: patientIdToken, email: patientEmail, id: foto.id });
+      const preview = card.querySelector('.patient-photo-preview');
+      if(imageRes.ok){
+        const img = document.createElement('img');
+        img.alt = foto.tipo;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        img.src = 'data:' + imageRes.mimeType + ';base64,' + imageRes.fileBase64;
+        preview.innerHTML = '';
+        preview.appendChild(img);
+      } else {
+        preview.textContent = imageRes.error || 'Imagem indisponível';
+      }
+    }
+  }
 
   /* ── PAINEL DA REGIANE (admin) ── */
   async function loadAdminBookings(){
@@ -1006,7 +1068,8 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
             <h3 style="margin:0;">${p.nome || p.email}</h3>
-            <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas</p>
+            <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas · ${p.fotosTotal || 0} fotos</p>
+            <p class="card-text" style="margin:4px 0 0;"><strong>Crédito:</strong> R$ ${Number(p.creditoDisponivel || 0).toFixed(2).replace('.', ',')} disponível · R$ ${Number(p.creditoUsado || 0).toFixed(2).replace('.', ',')} utilizado · R$ ${Number(p.creditoGerado || 0).toFixed(2).replace('.', ',')} gerado</p>
           </div>
           <span class="mli-tag" style="background:${p.temPlano ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.temPlano ? 'var(--marsala-deep)' : '#7A2222'};">${p.temPlano ? 'Com plano' : 'Sem plano — pendente'}</span>
         </div>
@@ -1025,10 +1088,33 @@
           <button type="button" class="btn btn-outline btn-sm admin-pdf-upload" style="margin-left:8px;">Enviar PDF</button>
           <span class="admin-pdf-status" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
         </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rose-mist);">
+          <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:8px;">Registrar uso de crédito</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input type="number" min="0.01" step="0.01" class="admin-credit-value" placeholder="Valor em R$" style="max-width:130px;padding:9px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+            <input type="text" class="admin-credit-description" placeholder="Motivo do uso" style="flex:1;min-width:180px;padding:9px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+            <button type="button" class="btn btn-outline btn-sm admin-credit-use">Descontar crédito</button>
+            <span class="admin-credit-status" style="font-size:12.5px;color:var(--muted);"></span>
+          </div>
+        </div>
       `;
       const textarea = card.querySelector('.admin-plano-input');
       const saveBtn = card.querySelector('.admin-plano-save');
       const status = card.querySelector('.admin-plano-status');
+      const creditBtn = card.querySelector('.admin-credit-use');
+      creditBtn.addEventListener('click', async ()=>{
+        const valueInput = card.querySelector('.admin-credit-value');
+        const descriptionInput = card.querySelector('.admin-credit-description');
+        const creditStatus = card.querySelector('.admin-credit-status');
+        const valor = valueInput.value;
+        if(!valor || Number(valor) <= 0){ creditStatus.textContent = 'Informe o valor utilizado.'; return; }
+        creditBtn.disabled = true;
+        creditStatus.textContent = 'Registrando...';
+        const used = await apiPost('adminUseCredit', { idToken: patientIdToken, email: p.email, valor, descricao: descriptionInput.value.trim() });
+        creditBtn.disabled = false;
+        if(used.ok){ creditStatus.textContent = 'Crédito descontado ✓'; loadAdminPatients(); }
+        else creditStatus.textContent = used.error || 'Não foi possível registrar o uso.';
+      });
       card.querySelector('.admin-patient-remove').addEventListener('click', async ()=>{
         if(!confirm('Remover o acesso desta paciente? Os registros complementares serão preservados.')) return;
         const removed = await apiPost('adminRemovePatient', { idToken: patientIdToken, email: p.email });
