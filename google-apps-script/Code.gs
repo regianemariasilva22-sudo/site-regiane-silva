@@ -605,11 +605,11 @@ function actionAdminRegisterInstagramEngagement(body) {
     const awarded = [];
     const duplicate = [];
     if (liked) {
-      const result = addPointsUnlocked_(email, 'Instagram — curtida', 5, 'instagram:curtida:' + postKey + ':' + instagram);
+      const result = addPointsUnlocked_(email, 'Instagram — curtida', 5, 'instagram:curtida:' + postKey + ':' + email);
       (result.added ? awarded : duplicate).push('curtida');
     }
     if (commented) {
-      const result = addPointsUnlocked_(email, 'Instagram — comentário', 5, 'instagram:comentario:' + postKey + ':' + instagram);
+      const result = addPointsUnlocked_(email, 'Instagram — comentário', 5, 'instagram:comentario:' + postKey + ':' + email);
       (result.added ? awarded : duplicate).push('comentário');
     }
     const atualizado = findPatientRow(email);
