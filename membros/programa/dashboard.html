@@ -238,6 +238,14 @@
             <div class="mli-icon">🤝</div>
             <div><div class="mli-title">Ajudar ou responder outra paciente</div><div class="mli-sub">+3 pontos por interação</div></div>
           </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">♥</div>
+            <div><div class="mli-title">Curtir um dos 3 posts mais recentes da Regiane</div><div class="mli-sub">+5 pontos por publicação, após a verificação semanal</div></div>
+          </div>
+          <div class="mem-list-item">
+            <div class="mli-icon">◎</div>
+            <div><div class="mli-title">Comentar em um dos 3 posts mais recentes da Regiane</div><div class="mli-sub">+5 pontos por publicação, após a verificação semanal</div></div>
+          </div>
           <p style="font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.6;">✦ Vale foto do seu corpo, do seu prato ou interação real na comunidade — não conta upload de qualquer imagem. A cada <strong>100 pontos</strong>, você ganha <strong>R$10</strong> de crédito, automaticamente.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
             <div style="flex:1;min-width:180px;">
@@ -258,6 +266,19 @@
           <p class="card-text" style="margin-top:14px;">Crédito gerado: <strong id="pontos-credito-gerado">R$ 0</strong> · já utilizado: <strong id="pontos-credito-usado">R$ 0</strong></p>
         </div>
       </div>
+
+      <h3 style="margin-top:34px;margin-bottom:16px;">Meu perfil do Instagram</h3>
+      <div class="mem-panel">
+        <p class="card-text" style="margin-bottom:12px;">Cadastre seu @ ou o link do perfil. É por ele que identificamos suas curtidas e comentários nos três posts mais recentes da Regiane.</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input id="patient-instagram" type="text" autocomplete="off" placeholder="@seuperfil ou https://instagram.com/seuperfil" style="flex:1;min-width:240px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <button type="button" class="btn btn-primary btn-sm" id="patient-instagram-save">Salvar Instagram</button>
+          <span id="patient-instagram-status" style="font-size:12.5px;color:var(--muted);"></span>
+        </div>
+      </div>
+
+      <h3 style="margin-top:34px;margin-bottom:16px;">Histórico de pontos</h3>
+      <div id="patient-points-history" class="mem-panel"><p class="card-text" style="color:var(--muted);">Nenhum ponto registrado ainda.</p></div>
 
       <h3 style="margin-top:34px;margin-bottom:16px;">Minhas fotos enviadas</h3>
       <p class="card-text" style="margin-bottom:14px;">Suas fotos ficam privadas e podem ser vistas somente por você e pelas administradoras do acompanhamento.</p>
@@ -471,6 +492,7 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
           <input id="admin-patient-name" type="text" placeholder="Nome da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
           <input id="admin-patient-email" type="email" placeholder="E-mail da paciente" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="admin-patient-instagram" type="text" placeholder="Instagram (opcional)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
           <button type="button" class="btn btn-primary btn-sm" id="admin-patient-add">Adicionar paciente</button>
@@ -605,6 +627,25 @@
     document.getElementById('pontos-credito-usado').textContent = 'R$ ' + d.creditoUsado;
     document.getElementById('pontos-faltam').textContent = d.faltamParaProximoCredito + ' pontos';
     document.getElementById('pontos-bar').style.width = (100 - d.faltamParaProximoCredito) + '%';
+    const instagramInput = document.getElementById('patient-instagram');
+    if(instagramInput && document.activeElement !== instagramInput) instagramInput.value = d.instagram || '';
+
+    const pointsHistory = document.getElementById('patient-points-history');
+    if(pointsHistory){
+      pointsHistory.innerHTML = '';
+      if(!d.pontosHistorico || !d.pontosHistorico.length){
+        pointsHistory.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhum ponto registrado ainda.</p>';
+      } else {
+        d.pontosHistorico.forEach(item=>{
+          const row = document.createElement('div');
+          row.className = 'mem-list-item';
+          row.innerHTML = '<div class="mli-icon">★</div><div><div class="mli-title"></div><div class="mli-sub"></div></div>';
+          row.querySelector('.mli-title').textContent = item.tipo || 'Pontos';
+          row.querySelector('.mli-sub').textContent = '+' + Number(item.pontos || 0) + ' pontos' + (item.data ? ' · ' + new Date(item.data).toLocaleString('pt-BR') : '');
+          pointsHistory.appendChild(row);
+        });
+      }
+    }
 
     const creditHistory = document.getElementById('patient-credit-history');
     if(creditHistory){
@@ -667,6 +708,28 @@
     }
   }
   loadDashboardData();
+
+  const patientInstagramSave = document.getElementById('patient-instagram-save');
+  if(patientInstagramSave){
+    patientInstagramSave.addEventListener('click', async ()=>{
+      const input = document.getElementById('patient-instagram');
+      const status = document.getElementById('patient-instagram-status');
+      patientInstagramSave.disabled = true;
+      status.textContent = 'Salvando...';
+      const res = await apiPost('saveInstagramProfile', {
+        idToken: patientIdToken,
+        email: patientEmail,
+        instagram: input.value.trim()
+      });
+      patientInstagramSave.disabled = false;
+      if(res.ok){
+        input.value = res.instagram || '';
+        status.textContent = res.instagram ? 'Instagram salvo ✓' : 'Instagram removido.';
+      } else {
+        status.textContent = res.error || 'Não foi possível salvar.';
+      }
+    });
+  }
   loadRoutineData();
 
   /* ── ROTINAS E CENTRAL DE NOTIFICAÇÕES DA PACIENTE ── */
@@ -1069,6 +1132,7 @@
           <div>
             <h3 style="margin:0;">${p.nome || p.email}</h3>
             <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas · ${p.fotosTotal || 0} fotos</p>
+            <p class="card-text" style="margin:4px 0 0;"><strong>Instagram:</strong> ${p.instagram || 'não cadastrado'}</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Crédito:</strong> R$ ${Number(p.creditoDisponivel || 0).toFixed(2).replace('.', ',')} disponível · R$ ${Number(p.creditoUsado || 0).toFixed(2).replace('.', ',')} utilizado · R$ ${Number(p.creditoGerado || 0).toFixed(2).replace('.', ',')} gerado</p>
           </div>
           <span class="mli-tag" style="background:${p.temPlano ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.temPlano ? 'var(--marsala-deep)' : '#7A2222'};">${p.temPlano ? 'Com plano' : 'Sem plano — pendente'}</span>
@@ -1089,6 +1153,16 @@
           <span class="admin-pdf-status" style="margin-left:10px;font-size:12.5px;color:var(--muted);"></span>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rose-mist);">
+          <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:8px;">Pontuação do Instagram — use somente nos 3 posts mais recentes</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" class="admin-instagram-post" placeholder="Link do post ou código da publicação" style="flex:1;min-width:230px;padding:9px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+            <label style="font-size:13px;"><input type="checkbox" class="admin-instagram-liked" /> Curtiu (+5)</label>
+            <label style="font-size:13px;"><input type="checkbox" class="admin-instagram-commented" /> Comentou (+5)</label>
+            <button type="button" class="btn btn-outline btn-sm admin-instagram-register">Registrar pontos</button>
+            <span class="admin-instagram-status" style="font-size:12.5px;color:var(--muted);"></span>
+          </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--rose-mist);">
           <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:8px;">Registrar uso de crédito</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <input type="number" min="0.01" step="0.01" class="admin-credit-value" placeholder="Valor em R$" style="max-width:130px;padding:9px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
@@ -1102,6 +1176,32 @@
       const saveBtn = card.querySelector('.admin-plano-save');
       const status = card.querySelector('.admin-plano-status');
       const creditBtn = card.querySelector('.admin-credit-use');
+      const instagramBtn = card.querySelector('.admin-instagram-register');
+      instagramBtn.disabled = !p.instagram;
+      instagramBtn.addEventListener('click', async ()=>{
+        const postInput = card.querySelector('.admin-instagram-post');
+        const liked = card.querySelector('.admin-instagram-liked').checked;
+        const commented = card.querySelector('.admin-instagram-commented').checked;
+        const instagramStatus = card.querySelector('.admin-instagram-status');
+        instagramBtn.disabled = true;
+        instagramStatus.textContent = 'Registrando...';
+        const result = await apiPost('adminRegisterInstagramEngagement', {
+          idToken: patientIdToken,
+          email: p.email,
+          postKey: postInput.value.trim(),
+          liked,
+          commented
+        });
+        instagramBtn.disabled = !p.instagram;
+        if(result.ok){
+          instagramStatus.textContent = result.pontosAdicionados
+            ? '+' + result.pontosAdicionados + ' pontos registrados ✓'
+            : 'Interação já pontuada anteriormente.';
+          if(result.pontosAdicionados) loadAdminPatients();
+        } else {
+          instagramStatus.textContent = result.error || 'Não foi possível registrar.';
+        }
+      });
       creditBtn.addEventListener('click', async ()=>{
         const valueInput = card.querySelector('.admin-credit-value');
         const descriptionInput = card.querySelector('.admin-credit-description');
@@ -1160,15 +1260,17 @@
     adminPatientAddBtn.addEventListener('click', async ()=>{
       const nome = document.getElementById('admin-patient-name').value.trim();
       const email = document.getElementById('admin-patient-email').value.trim();
+      const instagram = document.getElementById('admin-patient-instagram').value.trim();
       const status = document.getElementById('admin-patient-status');
       if(!nome || !email){ status.textContent = 'Informe nome e e-mail.'; return; }
       adminPatientAddBtn.disabled = true;
-      const res = await apiPost('adminAddPatient', { idToken: patientIdToken, nome, email });
+      const res = await apiPost('adminAddPatient', { idToken: patientIdToken, nome, email, instagram });
       adminPatientAddBtn.disabled = false;
       status.textContent = res.ok ? 'Paciente adicionada ✓' : (res.error || 'Erro ao adicionar.');
       if(res.ok){
         document.getElementById('admin-patient-name').value = '';
         document.getElementById('admin-patient-email').value = '';
+        document.getElementById('admin-patient-instagram').value = '';
         loadAdminPatients();
       }
     });

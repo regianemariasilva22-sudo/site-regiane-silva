@@ -55,6 +55,34 @@ function normEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function normalizeInstagramProfile_(value) {
+  let profile = String(value || '').trim();
+  if (!profile) return '';
+  profile = profile.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '');
+  profile = profile.replace(/^@+/, '').split(/[\/?#]/)[0].trim();
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(profile)) {
+    throw new Error('Informe um @ do Instagram ou um link de perfil válido.');
+  }
+  return '@' + profile.toLowerCase();
+}
+
+function normalizeInstagramPostKey_(value) {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error('Informe o link ou identificador da publicação.');
+  const urlMatch = raw.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+  const key = urlMatch ? urlMatch[1] : raw.replace(/^@+/, '');
+  if (!/^[A-Za-z0-9_-]{3,100}$/.test(key)) {
+    throw new Error('Link ou identificador da publicação inválido.');
+  }
+  return key;
+}
+
+function ensurePatientInstagramHeader_() {
+  const sheet = getSheet('Pacientes');
+  ensureHeaders_(sheet, ['Instagram']);
+  return sheet;
+}
+
 function ensureHeaders_(sheet, headers) {
   const lastColumn = sheet.getLastColumn();
   const current = lastColumn
@@ -205,6 +233,7 @@ function doPost(e) {
     if (action === 'uploadFoto') return jsonResponse(actionUploadFoto(body));
     if (action === 'patientPhotos') return jsonResponse(actionPatientPhotos(body));
     if (action === 'patientPhotoData') return jsonResponse(actionPatientPhotoData(body));
+    if (action === 'saveInstagramProfile') return jsonResponse(actionSaveInstagramProfile(body));
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminAddPatient') return jsonResponse(actionAdminAddPatient(body));
     if (action === 'adminRemovePatient') return jsonResponse(actionAdminRemovePatient(body));
@@ -212,6 +241,7 @@ function doPost(e) {
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
     if (action === 'adminUseCredit') return jsonResponse(actionAdminUseCredit(body));
+    if (action === 'adminRegisterInstagramEngagement') return jsonResponse(actionAdminRegisterInstagramEngagement(body));
     if (action === 'adminListRoutines') return jsonResponse(actionAdminListRoutines(body));
     if (action === 'adminSaveRoutine') return jsonResponse(actionAdminSaveRoutine(body));
     if (action === 'adminDeleteRoutine') return jsonResponse(actionAdminDeleteRoutine(body));
@@ -283,6 +313,7 @@ function daysSince(dateVal) {
 }
 
 function actionDashboard(email) {
+  ensurePatientInstagramHeader_();
   let p = findPatientRow(email);
   if (!p && isAdmin(email)) {
     // administradora sem cadastro de paciente: mostra um painel de exemplo, sem erro.
@@ -300,7 +331,7 @@ function actionDashboard(email) {
   const pontosLog = sheetToObjects(getSheet('PontosLog')).filter(function(l) { return normEmail(l.Email) === normEmail(email); });
   const totalInteracoes = pontosLog.filter(function(l) {
     const tipo = String(l.Tipo || '').toLowerCase();
-    return tipo.indexOf('comentário') === 0 || tipo.indexOf('foto') === 0;
+    return tipo.indexOf('comentário') === 0 || tipo.indexOf('foto') === 0 || tipo.indexOf('instagram') === 0;
   }).length;
   const credito = creditSummary_(email, pontosTotal);
 
@@ -325,7 +356,11 @@ function actionDashboard(email) {
     agendamentoData: proximoAgendamento ? proximoAgendamento.Data : '',
     agendamentoHora: proximoAgendamento ? proximoAgendamento.Hora : '',
     pontosTotal: pontosTotal,
+    instagram: p.Instagram || '',
     totalInteracoes: totalInteracoes,
+    pontosHistorico: pontosLog.sort(function(a, b) { return new Date(b.Data) - new Date(a.Data); }).slice(0, 30).map(function(l) {
+      return { tipo: l.Tipo || 'Pontos', pontos: Number(l.Pontos) || 0, data: l.Data || '' };
+    }),
     creditoGerado: credito.gerado,
     creditoUsado: credito.usado,
     creditoDisponivel: credito.disponivel,
@@ -340,6 +375,23 @@ function actionDashboard(email) {
 function actionPatientDashboard(body) {
   const email = patientEmailFromToken_(body);
   return actionDashboard(email);
+}
+
+function actionSaveInstagramProfile(body) {
+  const email = patientEmailFromToken_(body);
+  const instagram = normalizeInstagramProfile_(body.instagram);
+  const sheet = ensurePatientInstagramHeader_();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const instagramCol = headers.indexOf('Instagram');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === normEmail(email)) {
+      sheet.getRange(i + 1, instagramCol + 1).setValue(instagram);
+      return { ok: true, instagram: instagram };
+    }
+  }
+  return { ok: false, error: 'Paciente não encontrada.' };
 }
 
 /**
@@ -457,6 +509,7 @@ function actionCheckAccess(email, area) {
  */
 function actionAdminListPatients(body) {
   assertAdmin(body.idToken);
+  ensurePatientInstagramHeader_();
   ensureGamificationSheets_();
   const pacientes = sheetToObjects(getSheet('Pacientes'));
   return {
@@ -468,6 +521,7 @@ function actionAdminListPatients(body) {
       return {
         email: p.Email,
         nome: p.Nome,
+        instagram: p.Instagram || '',
         diasAcompanhamento: daysSince(p.DataInicio),
         retornosRealizados: Number(p.RetornosRealizados) || 0,
         receitasSalvas: Number(p.ReceitasSalvas) || 0,
@@ -532,27 +586,81 @@ function actionAdminUseCredit(body) {
   }
 }
 
+function actionAdminRegisterInstagramEngagement(body) {
+  const admin = assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  ensurePatientInstagramHeader_();
+  const paciente = findPatientRow(email);
+  if (!paciente) return { ok: false, error: 'Paciente não encontrada.' };
+  const instagram = normalizeInstagramProfile_(paciente.Instagram);
+  if (!instagram) return { ok: false, error: 'A paciente ainda não cadastrou o Instagram.' };
+  const postKey = normalizeInstagramPostKey_(body.postKey);
+  const liked = body.liked === true || String(body.liked).toLowerCase() === 'true';
+  const commented = body.commented === true || String(body.commented).toLowerCase() === 'true';
+  if (!liked && !commented) return { ok: false, error: 'Marque curtida e/ou comentário.' };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const awarded = [];
+    const duplicate = [];
+    if (liked) {
+      const result = addPointsUnlocked_(email, 'Instagram — curtida', 5, 'instagram:curtida:' + postKey + ':' + instagram);
+      (result.added ? awarded : duplicate).push('curtida');
+    }
+    if (commented) {
+      const result = addPointsUnlocked_(email, 'Instagram — comentário', 5, 'instagram:comentario:' + postKey + ':' + instagram);
+      (result.added ? awarded : duplicate).push('comentário');
+    }
+    const atualizado = findPatientRow(email);
+    return {
+      ok: true,
+      instagram: instagram,
+      postKey: postKey,
+      pontosAdicionados: awarded.length * 5,
+      registrados: awarded,
+      duplicados: duplicate,
+      pontosTotal: Number(atualizado && atualizado.PontosTotal) || 0,
+      registradoPor: admin.email
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function actionAdminAddPatient(body) {
   assertAdmin(body.idToken);
   const email = normEmail(body.email);
   const nome = String(body.nome || '').trim();
+  const instagram = normalizeInstagramProfile_(body.instagram);
   if (!email || email.indexOf('@') === -1 || !nome) {
     return { ok: false, error: 'Informe o nome e um e-mail válido.' };
   }
 
-  const sheet = getSheet('Pacientes');
+  const sheet = ensurePatientInstagramHeader_();
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const emailCol = headers.indexOf('Email');
   const nomeCol = headers.indexOf('Nome');
+  const instagramCol = headers.indexOf('Instagram');
   for (let i = 1; i < data.length; i++) {
     if (normEmail(data[i][emailCol]) === email) {
       sheet.getRange(i + 1, nomeCol + 1).setValue(nome);
+      if (instagram) sheet.getRange(i + 1, instagramCol + 1).setValue(instagram);
       return { ok: true, created: false };
     }
   }
 
-  sheet.appendRow([email, nome, new Date(), 0, 0, 0, '', '', '', 0, '', '']);
+  const row = headers.map(function() { return ''; });
+  row[emailCol] = email;
+  row[nomeCol] = nome;
+  row[headers.indexOf('DataInicio')] = new Date();
+  row[headers.indexOf('RetornosRealizados')] = 0;
+  row[headers.indexOf('ReceitasSalvas')] = 0;
+  row[headers.indexOf('ProgressoPercent')] = 0;
+  row[headers.indexOf('PontosTotal')] = 0;
+  row[instagramCol] = instagram;
+  sheet.appendRow(row);
   return { ok: true, created: true };
 }
 
@@ -1662,8 +1770,8 @@ function setupSheetStructure() {
   }
 
   buildSheet('Pacientes',
-    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal', 'ReceitasSalvasIds', 'PlanoPdfUrl'],
-    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '', '']);
+    ['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'ProximoRetornoData', 'ProximoRetornoHora', 'PlanoTexto', 'PontosTotal', 'ReceitasSalvasIds', 'PlanoPdfUrl', 'Instagram'],
+    ['exemplo@paciente.com', 'Nome de Exemplo', new Date(), 0, 0, 0, '', '', 'Siga as orientações da última consulta.', 0, '', '', '@perfil.exemplo']);
 
   buildSheet('Materiais',
     ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'],
