@@ -555,7 +555,7 @@
      se a Regiane excluir a paciente, o site desloga sozinho. ── */
   if(apiConfigured() && loggedInEmail && !isImpersonating){
     setInterval(async ()=>{
-      const r = await apiGet('checkAccess', { email: loggedInEmail, area: 'programa' });
+      const r = await apiPost('checkAccess', { idToken: patientIdToken, area: 'programa' });
       if(r && r.ok === false){
         sessionStorage.removeItem('rs_programa_email');
         sessionStorage.removeItem('rs_programa_nome');
@@ -927,7 +927,7 @@
 
   async function bookSlot(iso, data, hora){
     if(!patientEmail){ alert('Faça login novamente para agendar.'); return; }
-    const res = await apiPost('bookSlot', { email: patientEmail, iso: iso });
+    const res = await apiPost('bookSlot', { idToken: patientIdToken, email: patientEmail, iso: iso });
     if(res.ok){
       alert('Horário solicitado pra ' + data + ' às ' + hora + '! Assim que a Regiane confirmar, você vai ver aqui e vai cair na sua agenda também.');
       loadDashboardData();

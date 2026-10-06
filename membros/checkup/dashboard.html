@@ -431,7 +431,7 @@
      se a Regiane excluir/desmarcar o Liberado na planilha, desloga sozinho. ── */
   if(apiConfigured() && loggedInEmail && !isImpersonating){
     setInterval(async ()=>{
-      const r = await apiGet('checkAccess', { email: loggedInEmail, area: 'checkup' });
+      const r = await apiPost('checkAccess', { idToken: patientIdToken, area: 'checkup' });
       if(r && r.ok === false){
         sessionStorage.removeItem('rs_checkup_email');
         sessionStorage.removeItem('rs_checkup_nome');
@@ -457,7 +457,7 @@
      pela própria paciente reabrindo a página quanto no "ver como paciente". ── */
   async function loadCheckupStatus(){
     if(!apiConfigured() || !patientEmail) return;
-    const r = await apiGet('checkupDashboard', { email: patientEmail });
+    const r = await apiPost('checkupDashboard', { idToken: patientIdToken, email: patientEmail });
     if(!r.ok) return;
     if(r.jaFezCheckup){
       const jaRespondeuMsg = document.createElement('p');

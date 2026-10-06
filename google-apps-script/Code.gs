@@ -205,12 +205,7 @@ function notifyRegiane(assunto, corpo) {
 function doGet(e) {
   try {
     const action = e.parameter.action;
-    if (action === 'login') return jsonResponse(actionLogin(e.parameter.email));
-    if (action === 'dashboard') return jsonResponse(actionDashboard(e.parameter.email));
-    if (action === 'comments') return jsonResponse(actionCommentsLegacy_(e.parameter.postId));
     if (action === 'slots') return jsonResponse(actionSlots());
-    if (action === 'checkAccess') return jsonResponse(actionCheckAccess(e.parameter.email, e.parameter.area));
-    if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(e.parameter.email));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
@@ -225,8 +220,10 @@ function doPost(e) {
     if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
+    if (action === 'checkAccess') return jsonResponse(actionCheckAccess(body));
     if (action === 'googleLoginPrograma') return jsonResponse(actionGoogleLoginPrograma(body));
     if (action === 'googleLoginCheckup') return jsonResponse(actionGoogleLoginCheckup(body));
+    if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(body));
     if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
     if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
@@ -486,18 +483,20 @@ function actionUploadFoto(body) {
 }
 
 /**
- * Checagem leve (sem token) usada pelo site pra saber, de tempos em tempos
+ * Checagem autenticada usada pelo site pra saber, de tempos em tempos
  * enquanto a página está aberta, se aquele e-mail ainda está cadastrado —
  * se a Regiane excluir a linha da planilha, o site desloga sozinho.
  */
-function actionCheckAccess(email, area) {
-  if (isAdmin(email)) return { ok: true };
-  if (area === 'checkup') {
+function actionCheckAccess(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  if (isAdmin(auth.email)) return { ok: true };
+  if (body.area === 'checkup') {
+    const email = auth.email;
     const c = findCheckupRow(email);
     if (!c || String(c.Liberado).trim().toLowerCase() !== 'sim') return { ok: false };
     return { ok: true };
   }
-  return { ok: !!findPatientRow(email) };
+  return { ok: !!findPatientRow(auth.email) };
 }
 
 // ── PAINEL DA ADMINISTRADORA ─────────────────────────────
@@ -1252,7 +1251,7 @@ const COR_CONFIRMADO = '#D4EDDA';
  * de verdade no Google Agenda dela.
  */
 function actionBookSlot(body) {
-  const email = normEmail(body.email);
+  const email = patientEmailFromToken_(body);
   let nome;
   const p = findPatientRow(email);
   if (p) {
@@ -1418,7 +1417,14 @@ function actionGoogleLoginCheckup(body) {
  * as respostas) — usado tanto pela própria paciente reabrindo a página
  * quanto pela Regiane no "ver como paciente" do Painel dela.
  */
-function actionCheckupDashboard(email) {
+function actionCheckupDashboard(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  const requested = normEmail(body.email || body.targetEmail);
+  let email = auth.email;
+  if (requested && requested !== auth.email) {
+    if (!isAdmin(auth.email)) throw new Error('Você não pode acessar os dados de outra paciente.');
+    email = requested;
+  }
   const c = findCheckupRow(email);
   if (!c) return { ok: false, error: 'Check-up não encontrado.' };
   return {
