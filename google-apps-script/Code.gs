@@ -225,7 +225,14 @@ function doPost(e) {
     if (action === 'googleLoginCheckup') return jsonResponse(actionGoogleLoginCheckup(body));
     if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(body));
     if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
-    if (action === 'asaasWebhook') return jsonResponse(actionAsaasWebhook(body));
+    // A integração automática com o Asaas ainda não possui validação
+    // criptográfica configurada. Não aceite payloads públicos que poderiam
+    // liberar o Check-up para qualquer e-mail. A liberação segue disponível
+    // com autenticação pelo painel administrativo e pela planilha.
+    if (action === 'asaasWebhook') return jsonResponse({
+      ok: false,
+      error: 'Integração automática do Asaas ainda não configurada. Libere o acesso pelo painel administrativo.'
+    });
     if (action === 'saveRecipe') return jsonResponse(actionSaveRecipe(body));
     if (action === 'uploadFoto') return jsonResponse(actionUploadFoto(body));
     if (action === 'patientPhotos') return jsonResponse(actionPatientPhotos(body));
