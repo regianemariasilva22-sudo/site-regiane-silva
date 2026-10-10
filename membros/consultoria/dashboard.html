@@ -94,6 +94,7 @@ document.getElementById('logout').addEventListener('click',e=>{e.preventDefault(
 function consultoriaAuth(){return patientIdToken?{idToken:patientIdToken}:{accessToken:patientAccessToken};}
 function showTab(name){document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));const tab=document.getElementById('tab-'+name);if(tab)tab.style.display='block';if(name==='admin')loadAdmin();window.scrollTo({top:0,behavior:'smooth'});}
 const VIDEOS=[
+ {id:'ys9cWQ8lnD0',titulo:'27 de agosto de 2026'},
  {id:'qGyBqw2VRxU',titulo:'Orientação da Regiane — vídeo 1'},
  {id:'OQckLV-UCCQ',titulo:'Orientação da Regiane — vídeo 2'},
  {id:'zk34VhGMjZ4',titulo:'Orientação da Regiane — vídeo 3'},
