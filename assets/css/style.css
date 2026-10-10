@@ -576,7 +576,7 @@ footer{ background:var(--bg); border-top:1px solid var(--hairline-soft); padding
 .video-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
 /* ── MEMBER PORTAL CHOOSER ── */
-.portal-grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; max-width:820px; margin:0 auto; }
+.portal-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:22px; max-width:1100px; margin:0 auto; }
 .portal-card{ padding:44px 34px; border-radius:24px; background:var(--surface); border:1px solid var(--hairline); text-align:left; text-decoration:none; display:block; transition:all .3s; }
 .portal-card:hover{ border-color:rgba(122,42,59,.26); transform:translateY(-8px); box-shadow:0 22px 50px rgba(122,42,59,.14); }
 .portal-icon{ width:52px; height:52px; border-radius:14px; background:var(--rose-mist); color:var(--marsala); display:flex; align-items:center; justify-content:center; margin-bottom:24px; }

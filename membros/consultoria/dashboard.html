@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Área da Consultoria | Regiane Silva</title>
+<link rel="icon" type="image/svg+xml" href="../../assets/img/favicon.svg" />
+<link rel="stylesheet" href="../../assets/css/style.css" />
+<style>
+  .consult-form{display:grid;grid-template-columns:1fr 1fr;gap:18px}.consult-field{display:flex;flex-direction:column;gap:7px}.consult-field.full{grid-column:1/-1}.consult-field label{font-size:13px;font-weight:700;color:var(--marsala-deep)}.consult-field input,.consult-field select,.consult-field textarea{width:100%;border:1px solid var(--hairline);border-radius:12px;background:var(--surface);padding:12px 14px;font:inherit;color:var(--ink);outline:none}.consult-field textarea{min-height:105px;resize:vertical}.consult-field input:focus,.consult-field select:focus,.consult-field textarea:focus{border-color:var(--marsala)}.form-status{font-size:13px;color:var(--marsala);font-weight:700;margin-top:14px}.video-grid.consult-videos{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-answer{margin-top:14px;padding:16px;border-radius:12px;background:var(--surface-tint);font-size:13px;line-height:1.65;white-space:pre-wrap}.required-note{font-size:12px;color:var(--muted);margin-bottom:20px}.saved-banner{display:none;padding:16px 18px;border-radius:14px;background:var(--rose-mist);color:var(--marsala-deep);font-weight:700;margin-bottom:20px}@media(max-width:760px){.consult-form,.video-grid.consult-videos{grid-template-columns:1fr}.consult-field.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<canvas id="grain-canvas"></canvas><div class="c-dot" id="cdot"></div><div class="c-ring" id="cring"></div>
+<div id="loader"><div class="loader-mark">Regiane Silva</div><div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div></div>
+<div class="mem-shell">
+  <aside class="mem-side">
+    <div><div class="lg-name">Regiane Silva</div><span class="lg-sub">Área da Consultoria</span></div>
+    <ul class="mem-nav">
+      <li><a href="#inicio" class="active" onclick="showTab('inicio');return false;">Início</a></li>
+      <li><a href="#preparacao" onclick="showTab('preparacao');return false;">Preparação</a></li>
+      <li><a href="#videos" onclick="showTab('videos');return false;">Vídeos</a></li>
+      <li id="nav-admin" style="display:none;"><a href="#admin" onclick="showTab('admin');return false;">Painel da Regiane</a></li>
+    </ul>
+    <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
+    <div class="mem-user"><div class="mem-avatar"></div><div><div class="mem-user-name" id="mem-user-name">Paciente</div><div class="mem-user-role">Consultoria Nutricional</div></div><a href="#" class="mem-logout" id="logout">Sair</a></div>
+  </aside>
+  <main class="mem-main">
+    <div id="impersonate-banner" style="display:none;background:var(--marsala);color:#fff;padding:12px 20px;border-radius:12px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span>Visualizando como: <strong id="impersonate-name"></strong></span><a href="dashboard.html?tab=admin" style="color:#fff;text-decoration:underline;font-size:13px;">← Voltar ao painel</a></div>
+
+    <div id="tab-inicio">
+      <h1 class="mem-hello">Sua Consultoria Nutricional 🌿</h1>
+      <p class="mem-sub">Um encontro de 40 a 50 minutos para entender sua rotina e adaptar um cardápio qualitativo ao seu objetivo.</p>
+      <div class="mem-grid">
+        <div class="mem-panel reveal in"><h3>Antes do atendimento</h3><p class="card-text">Responda a preparação com calma. A Regiane receberá suas respostas antes do encontro e você também receberá uma cópia por e-mail.</p><button type="button" class="btn btn-primary btn-sm" onclick="showTab('preparacao')" style="margin-top:20px;">Responder preparação →</button></div>
+        <div class="mem-panel reveal in d1"><h3>O que você vai receber</h3><ul class="belief-list yes"><li><span class="badge">✓</span>Anamnese simplificada e direcionada.</li><li><span class="badge">✓</span>Ajustes no cardápio que você já consome.</li><li><span class="badge">✓</span>Orientação qualitativa, sem cálculo completo de plano alimentar.</li><li><span class="badge">✓</span>Possibilidade de acompanhamento a cada 30 dias.</li></ul></div>
+      </div>
+    </div>
+
+    <div id="tab-preparacao" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Preparação para a consultoria</h1>
+      <p class="mem-sub">Estas informações ajudam a Regiane a aproveitar melhor o tempo do seu atendimento.</p>
+      <div id="saved-banner" class="saved-banner">Suas respostas foram recebidas. Você pode atualizá-las antes da consultoria, se precisar.</div>
+      <form id="consult-form" class="mem-panel">
+        <p class="required-note">Os campos marcados com * são obrigatórios.</p>
+        <div class="consult-form">
+          <div class="consult-field"><label for="modalidade">Modalidade</label><select id="modalidade"><option value="">Selecione</option><option>Presencial</option><option>Online</option><option>A definir</option></select></div>
+          <div class="consult-field"><label for="objetivo">Qual é o seu principal objetivo? *</label><input id="objetivo" required placeholder="Ex.: emagrecer, melhorar a alimentação..." /></div>
+          <div class="consult-field full"><label for="medicamentos">Usa medicamentos ou suplementos? Quais?</label><textarea id="medicamentos" placeholder="Se não usa, escreva: não uso."></textarea></div>
+          <div class="consult-field full"><label for="patologias">Possui algum diagnóstico, patologia ou condição de saúde?</label><textarea id="patologias" placeholder="Inclua informações relevantes para o atendimento."></textarea></div>
+          <div class="consult-field full"><label for="intestino">Como funciona seu intestino? *</label><textarea id="intestino" required placeholder="Frequência, constipação, diarreia, gases, inchaço ou desconfortos."></textarea></div>
+          <div class="consult-field full"><label for="alergias">Possui alergia ou intolerância alimentar?</label><textarea id="alergias" placeholder="Se não possui, escreva: não possuo."></textarea></div>
+          <div class="consult-field full"><label for="preferencias">Quais alimentos gosta, não gosta ou não costuma consumir?</label><textarea id="preferencias"></textarea></div>
+          <div class="consult-field"><label for="cafe">O que costuma comer no café da manhã? *</label><textarea id="cafe" required></textarea></div>
+          <div class="consult-field"><label for="almoco">O que costuma comer no almoço? *</label><textarea id="almoco" required></textarea></div>
+          <div class="consult-field"><label for="lanche">O que costuma comer nos lanches?</label><textarea id="lanche"></textarea></div>
+          <div class="consult-field"><label for="jantar">O que costuma comer no jantar? *</label><textarea id="jantar" required></textarea></div>
+          <div class="consult-field full"><label for="outros">Há mais alguma informação que a Regiane precisa saber?</label><textarea id="outros"></textarea></div>
+        </div>
+        <button type="submit" id="submit-consult" class="btn btn-primary" style="margin-top:22px;">Enviar respostas</button>
+        <div id="form-status" class="form-status"></div>
+      </form>
+    </div>
+
+    <div id="tab-videos" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Vídeos da Regiane</h1><p class="mem-sub">Conteúdos complementares para apoiar sua rotina e sua consultoria.</p>
+      <div class="video-grid consult-videos" id="consult-video-grid"></div>
+    </div>
+
+    <div id="tab-admin" style="display:none;">
+      <h1 class="mem-hello" style="font-size:28px;">Pacientes da Consultoria</h1><p class="mem-sub">Adicione, libere ou remova o acesso e confira as respostas preservadas.</p>
+      <div class="mem-panel" style="margin-bottom:24px;"><h3>Adicionar paciente</h3><div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;"><div class="consult-field"><label for="admin-name">Nome</label><input id="admin-name" /></div><div class="consult-field"><label for="admin-email">E-mail</label><input id="admin-email" type="email" /></div><button type="button" id="admin-add" class="btn btn-primary btn-sm">Liberar acesso</button></div><div id="admin-status" class="form-status"></div></div>
+      <div id="admin-list"></div>
+    </div>
+  </main>
+</div>
+
+<div class="video-modal-overlay" id="video-modal" style="display:none;"><div class="video-modal-box"><button class="video-modal-close" id="video-modal-close">×</button><div class="video-modal-frame"><iframe id="video-modal-iframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><div class="video-modal-title" id="video-modal-title"></div></div></div>
+
+<script src="../../assets/js/api.js"></script><script src="../../assets/js/main.js"></script>
+<script>
+const params=new URLSearchParams(location.search);
+const previewMode=location.protocol==='file:'||params.get('preview')==='1';
+const loggedInEmail=sessionStorage.getItem('rs_consultoria_email')||(previewMode?'paciente@previa.com':'');
+const patientIdToken=sessionStorage.getItem('rs_consultoria_idtoken')||(previewMode?'modo-previa':'');
+const patientAccessToken=sessionStorage.getItem('rs_consultoria_access_token')||'';
+const isAdminUser=!previewMode&&sessionStorage.getItem('rs_consultoria_admin')==='1';
+const impersonateEmail=params.get('as');const isImpersonating=!!(isAdminUser&&impersonateEmail);const patientEmail=isImpersonating?impersonateEmail:loggedInEmail;
+if((!loggedInEmail||(!patientIdToken&&!patientAccessToken))&&!previewMode){location.href='login.html';}
+if(isAdminUser)document.getElementById('nav-admin').style.display='block';
+document.getElementById('mem-user-name').textContent=(sessionStorage.getItem('rs_consultoria_nome')||(previewMode?'Paciente — prévia':patientEmail)||'Paciente').split('@')[0];
+if(isImpersonating){document.getElementById('impersonate-banner').style.display='flex';document.getElementById('impersonate-name').textContent=impersonateEmail;document.getElementById('mem-user-name').textContent=impersonateEmail.split('@')[0];}
+document.getElementById('logout').addEventListener('click',e=>{e.preventDefault();['rs_consultoria_email','rs_consultoria_nome','rs_consultoria_admin','rs_consultoria_idtoken','rs_consultoria_access_token'].forEach(k=>sessionStorage.removeItem(k));location.href='login.html';});
+function consultoriaAuth(){return patientIdToken?{idToken:patientIdToken}:{accessToken:patientAccessToken};}
+function showTab(name){document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));const tab=document.getElementById('tab-'+name);if(tab)tab.style.display='block';if(name==='admin')loadAdmin();window.scrollTo({top:0,behavior:'smooth'});}
+const VIDEOS=[
+ {id:'qGyBqw2VRxU',titulo:'Orientação da Regiane — vídeo 1'},
+ {id:'OQckLV-UCCQ',titulo:'Orientação da Regiane — vídeo 2'},
+ {id:'zk34VhGMjZ4',titulo:'Orientação da Regiane — vídeo 3'},
+ {id:'4D4WQ8aolsU',titulo:'Orientação da Regiane — vídeo 4'},
+ {id:'QjFC9P-sLl8',titulo:'Orientação da Regiane — vídeo 5'}
+];
+function renderVideos(){const grid=document.getElementById('consult-video-grid');VIDEOS.forEach(v=>{const card=document.createElement('div');card.className='video-card';card.innerHTML=`<div class="video-thumb" style="aspect-ratio:9/14;background-image:linear-gradient(180deg,rgba(59,32,36,0) 55%,rgba(59,32,36,.55) 100%),url('https://img.youtube.com/vi/${v.id}/hqdefault.jpg');background-size:cover;background-position:center"><div class="video-play">▶</div></div><div class="video-body"><div class="video-cat">Regiane explica</div><div class="video-title">${v.titulo}</div></div>`;card.addEventListener('click',()=>openVideo(v));grid.appendChild(card);});}
+function openVideo(v){document.getElementById('video-modal-iframe').src='https://www.youtube-nocookie.com/embed/'+v.id+'?rel=0&modestbranding=1';document.getElementById('video-modal-title').textContent=v.titulo;document.getElementById('video-modal').style.display='flex';}
+function closeVideo(){document.getElementById('video-modal').style.display='none';document.getElementById('video-modal-iframe').src='';}document.getElementById('video-modal-close').addEventListener('click',closeVideo);document.getElementById('video-modal').addEventListener('click',e=>{if(e.target.id==='video-modal')closeVideo();});renderVideos();
+function fillForm(r){Object.keys(r||{}).forEach(k=>{const el=document.getElementById(k);if(el)el.value=r[k]||'';});}
+async function loadData(){if(previewMode){document.getElementById('form-status').textContent='Modo de prévia: nenhum dado será enviado.';return;}const r=await apiPost('consultoriaDashboard',Object.assign(consultoriaAuth(),{email:patientEmail}));if(!r.ok){document.getElementById('form-status').textContent=r.error||'Não foi possível carregar seus dados.';return;}if(r.respostas)fillForm(r.respostas);if(r.respondeu)document.getElementById('saved-banner').style.display='block';if(isImpersonating){document.getElementById('submit-consult').disabled=true;document.getElementById('form-status').textContent='Modo de visualização: as respostas não podem ser alteradas.';}}
+document.getElementById('consult-form').addEventListener('submit',async e=>{e.preventDefault();if(isImpersonating)return;const btn=document.getElementById('submit-consult'),status=document.getElementById('form-status');const respostas={};['modalidade','objetivo','medicamentos','patologias','intestino','alergias','preferencias','cafe','almoco','lanche','jantar','outros'].forEach(k=>respostas[k]=document.getElementById(k).value.trim());if(previewMode){status.textContent='Prévia concluída ✓ Na versão publicada, estas respostas irão para a planilha e para os dois e-mails.';document.getElementById('saved-banner').style.display='block';return;}btn.disabled=true;status.textContent='Enviando...';const r=await apiPost('submitConsultoriaAnamnese',Object.assign(consultoriaAuth(),{respostas}));btn.disabled=false;if(r.ok){status.textContent='Respostas enviadas ✓ A Regiane e você receberam uma cópia por e-mail.';document.getElementById('saved-banner').style.display='block';}else status.textContent=r.error||'Não foi possível enviar.';});
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function answerText(r){if(!r)return 'Ainda não respondeu.';const labels={modalidade:'Modalidade',objetivo:'Objetivo',medicamentos:'Medicamentos e suplementos',patologias:'Patologias/condições',intestino:'Intestino',alergias:'Alergias/intolerâncias',preferencias:'Preferências',cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanches',jantar:'Jantar',outros:'Outras informações'};return Object.keys(labels).map(k=>labels[k]+': '+(r[k]||'Não informado')).join('\n');}
+async function loadAdmin(){if(!isAdminUser)return;const wrap=document.getElementById('admin-list');wrap.innerHTML='<p class="card-text">Carregando...</p>';const r=await apiPost('adminListConsultoriaPatients',{idToken:patientIdToken});if(!r.ok){wrap.textContent=r.error||'Erro ao carregar.';return;}if(!r.pacientes.length){wrap.innerHTML='<p class="card-text">Nenhuma paciente cadastrada na aba ConsultoriaPacientes.</p>';return;}wrap.innerHTML='';r.pacientes.forEach(p=>{const card=document.createElement('div');card.className='mem-panel';card.style.marginBottom='16px';card.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h3 style="margin:0">${esc(p.nome||p.email)}</h3><p class="card-text" style="margin:3px 0">${esc(p.email)}${p.dataResposta?' · respondeu em '+esc(p.dataResposta):''}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-outline btn-sm" href="dashboard.html?as=${encodeURIComponent(p.email)}">Ver como paciente</a><button class="btn btn-outline btn-sm access-btn">${p.liberado?'Remover acesso':'Liberar acesso'}</button></div></div><details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700;color:var(--marsala)">Ver respostas</summary><div class="admin-answer">${esc(answerText(p.respostas))}</div></details>`;card.querySelector('.access-btn').addEventListener('click',async ev=>{ev.currentTarget.disabled=true;const x=await apiPost('adminSetConsultoriaAccess',{idToken:patientIdToken,email:p.email,liberado:!p.liberado});if(x.ok)loadAdmin();else ev.currentTarget.disabled=false;});wrap.appendChild(card);});}
+document.getElementById('admin-add').addEventListener('click',async()=>{const nome=document.getElementById('admin-name').value.trim(),email=document.getElementById('admin-email').value.trim(),status=document.getElementById('admin-status'),btn=document.getElementById('admin-add');if(!nome||!email){status.textContent='Informe nome e e-mail.';return;}btn.disabled=true;const r=await apiPost('adminAddConsultoriaPatient',{idToken:patientIdToken,nome,email});btn.disabled=false;status.textContent=r.ok?'Acesso liberado ✓':(r.error||'Erro ao adicionar.');if(r.ok){document.getElementById('admin-name').value='';document.getElementById('admin-email').value='';loadAdmin();}});
+const start=params.get('tab');if(start)showTab(start);loadData();
+</script>
+</body>
+</html>

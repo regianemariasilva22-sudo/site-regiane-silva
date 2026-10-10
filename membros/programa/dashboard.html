@@ -528,6 +528,13 @@
   const impersonateEmail = urlParams.get('as');
   const isImpersonating = !!(impersonateEmail && isAdminUser);
   const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
+  const VIDEOS_REGIANE = [
+    { tipo:'Regiane explica', titulo:'Orientação da Regiane — vídeo 1', link:'https://youtube.com/shorts/qGyBqw2VRxU', area:'aulas' },
+    { tipo:'Regiane explica', titulo:'Orientação da Regiane — vídeo 2', link:'https://youtube.com/shorts/OQckLV-UCCQ', area:'aulas' },
+    { tipo:'Regiane explica', titulo:'Orientação da Regiane — vídeo 3', link:'https://youtube.com/shorts/zk34VhGMjZ4', area:'aulas' },
+    { tipo:'Regiane explica', titulo:'Orientação da Regiane — vídeo 4', link:'https://youtube.com/shorts/4D4WQ8aolsU', area:'aulas' },
+    { tipo:'Regiane explica', titulo:'Orientação da Regiane — vídeo 5', link:'https://youtube.com/shorts/QjFC9P-sLl8', area:'aulas' }
+  ];
   (function(){
     const nome = sessionStorage.getItem('rs_programa_nome');
     if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
@@ -670,12 +677,17 @@
       document.getElementById('plano-pdf-link').href = d.planoPdfUrl;
     }
 
-    if(d.materiais && d.materiais.length){
-      const materiaisGerais = d.materiais.filter(m => (m.area || 'materiais') === 'materiais');
-      const aulasVideos = d.materiais.filter(m => m.area === 'aulas');
-      const rotuloVideos = d.materiais.filter(m => m.area === 'rotulo');
+    const materiaisDisponiveis = d.materiais || [];
+    const materiaisGerais = materiaisDisponiveis.filter(m => (m.area || 'materiais') === 'materiais');
+    const idsFixos = VIDEOS_REGIANE.map(v => (v.link.match(/shorts\/([A-Za-z0-9_-]+)/)||[])[1]);
+    const aulasVideos = VIDEOS_REGIANE.concat(materiaisDisponiveis.filter(m => {
+      if(m.area !== 'aulas') return false;
+      const id = ((m.link || '').match(/(?:shorts\/|youtu\.be\/|v=)([A-Za-z0-9_-]{11})/) || [])[1];
+      return !id || idsFixos.indexOf(id) === -1;
+    }));
+    const rotuloVideos = materiaisDisponiveis.filter(m => m.area === 'rotulo');
 
-      if(materiaisGerais.length){
+    if(materiaisGerais.length){
         const wrap = document.getElementById('materiais-pessoais');
         document.getElementById('materiais-pessoais-title').style.display = 'block';
         materiaisGerais.forEach(m=>{
@@ -691,21 +703,20 @@
           }
           wrap.appendChild(card);
         });
-      }
-
-      if(aulasVideos.length){
-        const grid = document.getElementById('video-grid-aulas');
-        aulasVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
-      }
-
-      if(rotuloVideos.length){
-        document.getElementById('rotulo-videos-title').style.display = 'block';
-        const grid = document.getElementById('video-grid-rotulo');
-        rotuloVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
-      }
-
-      if(window.__rebindCursor) window.__rebindCursor();
     }
+
+    if(aulasVideos.length){
+      const grid = document.getElementById('video-grid-aulas');
+      aulasVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
+    }
+
+    if(rotuloVideos.length){
+      document.getElementById('rotulo-videos-title').style.display = 'block';
+      const grid = document.getElementById('video-grid-rotulo');
+      rotuloVideos.forEach(m => grid.appendChild(buildVideoCard(m)));
+    }
+
+    if(window.__rebindCursor) window.__rebindCursor();
   }
   loadDashboardData();
 

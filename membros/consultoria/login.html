@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entrar — Área da Consultoria | Regiane Silva</title>
+<link rel="icon" type="image/svg+xml" href="../../assets/img/favicon.svg" />
+<link rel="stylesheet" href="../../assets/css/style.css" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  .login-divider{display:flex;align-items:center;gap:12px;margin:22px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em}.login-divider:before,.login-divider:after{content:"";height:1px;background:var(--hairline);flex:1}.email-access{display:grid;gap:10px;text-align:left}.email-access label{font-size:12px;font-weight:700;color:var(--marsala-deep)}.email-access input{width:100%;border:1px solid var(--hairline);border-radius:100px;background:var(--surface);padding:12px 16px;font:inherit;color:var(--ink);outline:none}.email-access input:focus{border-color:var(--marsala)}.email-access .btn{width:100%;justify-content:center}.code-row{display:none;gap:8px}.code-row.show{display:grid}.code-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5}.email-status{font-size:12px;color:var(--marsala);font-weight:700;text-align:center;min-height:18px}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas><canvas id="grain-canvas"></canvas><div class="grid-bg"></div><div class="scan-line"></div>
+<div id="loader"><div class="loader-mark">Regiane Silva</div><div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div></div>
+<div class="auth-shell">
+  <div class="hero-glow" style="top:30%;"></div>
+  <div class="auth-card reveal in">
+    <div class="auth-logo"><div class="lg-name">Regiane Silva</div><span class="lg-sub">Área da Consultoria</span></div>
+    <h1 class="auth-title">Prepare sua consultoria</h1>
+    <p class="auth-sub">Entre com a mesma conta Google cadastrada pela Regiane para responder sua preparação e acessar os vídeos.</p>
+    <div class="auth-error" id="auth-error"></div>
+    <div id="g_signin_btn" style="display:flex;justify-content:center;"></div>
+
+    <div class="login-divider"><span>ou acesse por e-mail</span></div>
+    <div class="email-access">
+      <label for="access-email">E-mail cadastrado pela Regiane</label>
+      <input id="access-email" type="email" autocomplete="email" placeholder="seuemail@exemplo.com" />
+      <button type="button" class="btn btn-outline btn-sm" id="request-code">Receber código de acesso</button>
+      <div class="code-row" id="code-row">
+        <label for="access-code">Código de seis dígitos</label>
+        <input id="access-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+        <button type="button" class="btn btn-primary btn-sm" id="verify-code">Entrar com o código</button>
+        <div class="code-note">O código vale por 10 minutos e será enviado por Regiane Silva.</div>
+      </div>
+      <div class="email-status" id="email-status"></div>
+    </div>
+    <p class="auth-foot" style="margin-top:26px;"><a href="../index.html">← Voltar para a escolha de área</a></p>
+  </div>
+</div>
+<script src="../../assets/js/api.js"></script>
+<script src="../../assets/js/main.js"></script>
+<script>
+window.addEventListener('load', function(){
+  if(typeof google === 'undefined' || !google.accounts){
+    const err = document.getElementById('auth-error');
+    err.textContent = 'O botão do Google não carregou, mas você ainda pode entrar pelo código enviado ao seu e-mail.';
+    err.classList.add('show');
+  } else {
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+    google.accounts.id.renderButton(document.getElementById('g_signin_btn'), { theme:'outline', size:'large', shape:'pill', text:'continue_with', width:300 });
+  }
+});
+async function handleGoogleCredential(response){
+  const err = document.getElementById('auth-error'); err.classList.remove('show');
+  const result = await apiPost('googleLoginConsultoria', { idToken: response.credential });
+  if(result.ok){
+    sessionStorage.setItem('rs_consultoria_email', result.email);
+    sessionStorage.setItem('rs_consultoria_nome', result.nome || '');
+    sessionStorage.setItem('rs_consultoria_admin', result.admin ? '1' : '0');
+    sessionStorage.setItem('rs_consultoria_idtoken', response.credential);
+    sessionStorage.removeItem('rs_consultoria_access_token');
+    window.location.href = 'dashboard.html';
+  } else {
+    err.textContent = result.error || 'Não foi possível entrar com esta conta Google.';
+    err.classList.add('show');
+  }
+}
+
+const requestCodeBtn = document.getElementById('request-code');
+const verifyCodeBtn = document.getElementById('verify-code');
+const emailStatus = document.getElementById('email-status');
+requestCodeBtn.addEventListener('click', async function(){
+  const email = document.getElementById('access-email').value.trim();
+  if(!email){ emailStatus.textContent = 'Digite o e-mail cadastrado.'; return; }
+  requestCodeBtn.disabled = true; emailStatus.textContent = 'Enviando código...';
+  const result = await apiPost('requestConsultoriaAccessCode', { email });
+  requestCodeBtn.disabled = false;
+  if(result.ok){
+    document.getElementById('code-row').classList.add('show');
+    document.getElementById('access-code').focus();
+    emailStatus.textContent = 'Código enviado. Confira sua caixa de entrada e o spam.';
+  } else emailStatus.textContent = result.error || 'Não foi possível enviar o código.';
+});
+verifyCodeBtn.addEventListener('click', async function(){
+  const email = document.getElementById('access-email').value.trim();
+  const code = document.getElementById('access-code').value.trim();
+  if(code.length !== 6){ emailStatus.textContent = 'Digite o código de seis dígitos.'; return; }
+  verifyCodeBtn.disabled = true; emailStatus.textContent = 'Verificando...';
+  const result = await apiPost('verifyConsultoriaAccessCode', { email, code });
+  verifyCodeBtn.disabled = false;
+  if(result.ok){
+    sessionStorage.setItem('rs_consultoria_email', result.email);
+    sessionStorage.setItem('rs_consultoria_nome', result.nome || '');
+    sessionStorage.setItem('rs_consultoria_admin', '0');
+    sessionStorage.removeItem('rs_consultoria_idtoken');
+    sessionStorage.setItem('rs_consultoria_access_token', result.accessToken);
+    window.location.href = 'dashboard.html';
+  } else emailStatus.textContent = result.error || 'Código inválido.';
+});
+</script>
+</body>
+</html>

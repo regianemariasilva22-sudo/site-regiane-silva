@@ -225,6 +225,11 @@ function doPost(e) {
     if (action === 'googleLoginCheckup') return jsonResponse(actionGoogleLoginCheckup(body));
     if (action === 'checkupDashboard') return jsonResponse(actionCheckupDashboard(body));
     if (action === 'submitCheckup') return jsonResponse(actionSubmitCheckup(body));
+    if (action === 'googleLoginConsultoria') return jsonResponse(actionGoogleLoginConsultoria(body));
+    if (action === 'requestConsultoriaAccessCode') return jsonResponse(actionRequestConsultoriaAccessCode(body));
+    if (action === 'verifyConsultoriaAccessCode') return jsonResponse(actionVerifyConsultoriaAccessCode(body));
+    if (action === 'consultoriaDashboard') return jsonResponse(actionConsultoriaDashboard(body));
+    if (action === 'submitConsultoriaAnamnese') return jsonResponse(actionSubmitConsultoriaAnamnese(body));
     // A integração automática com o Asaas ainda não possui validação
     // criptográfica configurada. Não aceite payloads públicos que poderiam
     // liberar o Check-up para qualquer e-mail. A liberação segue disponível
@@ -258,6 +263,9 @@ function doPost(e) {
     if (action === 'adminListCheckupPatients') return jsonResponse(actionAdminListCheckupPatients(body));
     if (action === 'adminAddCheckupPatient') return jsonResponse(actionAdminAddCheckupPatient(body));
     if (action === 'adminSetCheckupAccess') return jsonResponse(actionAdminSetCheckupAccess(body));
+    if (action === 'adminListConsultoriaPatients') return jsonResponse(actionAdminListConsultoriaPatients(body));
+    if (action === 'adminAddConsultoriaPatient') return jsonResponse(actionAdminAddConsultoriaPatient(body));
+    if (action === 'adminSetConsultoriaAccess') return jsonResponse(actionAdminSetConsultoriaAccess(body));
     if (action === 'bioLead') return jsonResponse(actionBioLead(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
@@ -1613,6 +1621,247 @@ function actionAdminSetCheckupAccess(body) {
   return { ok: false, error: 'Paciente do check-up não encontrada.' };
 }
 
+// ── CONSULTORIA (anamnese simplificada pré-atendimento) ─────
+
+function ensureConsultoriaSheets_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let pacientes = ss.getSheetByName('ConsultoriaPacientes');
+  if (!pacientes) pacientes = ss.insertSheet('ConsultoriaPacientes');
+  ensureHeaders_(pacientes, ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'RespostasAnamnese', 'DataResposta']);
+  pacientes.setFrozenRows(1);
+
+  let respostas = ss.getSheetByName('ConsultoriaRespostas');
+  if (!respostas) respostas = ss.insertSheet('ConsultoriaRespostas');
+  ensureHeaders_(respostas, ['Id', 'Email', 'Nome', 'DataResposta', 'Modalidade', 'Objetivo', 'MedicamentosSuplementos', 'PatologiasCondicoes', 'Intestino', 'AlergiasIntolerancias', 'Preferencias', 'CafeDaManha', 'Almoco', 'Lanches', 'Jantar', 'OutrasInformacoes']);
+  respostas.setFrozenRows(1);
+  return { pacientes: pacientes, respostas: respostas };
+}
+
+function setupConsultoriaSheets() {
+  ensureConsultoriaSheets_();
+  SpreadsheetApp.flush();
+  return { ok: true };
+}
+
+function findConsultoriaRow(email) {
+  const sheet = ensureConsultoriaSheets_().pacientes;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === normEmail(email)) {
+      const obj = {};
+      headers.forEach(function(h, idx) { obj[h] = data[i][idx]; });
+      obj._row = i + 1;
+      return obj;
+    }
+  }
+  return null;
+}
+
+function consultoriaIdentityFromAuth_(body) {
+  if (body.idToken) return verifyGoogleToken(body.idToken);
+  const accessToken = String(body.accessToken || '').trim();
+  if (!accessToken) throw new Error('Sessão de acesso ausente. Entre novamente.');
+  const cached = CacheService.getScriptCache().get('consultoria-session:' + accessToken);
+  if (!cached) throw new Error('Sua sessão expirou. Solicite um novo código de acesso.');
+  const session = JSON.parse(cached);
+  return { email: normEmail(session.email), nome: session.nome || session.email, emailCode: true };
+}
+
+function consultoriaEmailFromToken_(body) {
+  const auth = consultoriaIdentityFromAuth_(body);
+  const requested = normEmail(body.email || body.targetEmail);
+  let email = auth.email;
+  if (requested && requested !== auth.email) {
+    if (!isAdmin(auth.email)) throw new Error('Você não pode acessar os dados de outra paciente.');
+    email = requested;
+  }
+  if (!isAdmin(auth.email) && !findConsultoriaRow(email)) throw new Error('Paciente da consultoria não encontrada.');
+  return { email: email, auth: auth };
+}
+
+function actionRequestConsultoriaAccessCode(body) {
+  const email = normEmail(body.email);
+  if (!email || email.indexOf('@') === -1) return { ok: false, error: 'Informe um e-mail válido.' };
+  const paciente = findConsultoriaRow(email);
+  if (!paciente || String(paciente.Liberado).trim().toLowerCase() !== 'sim') {
+    return { ok: false, error: 'Este e-mail não possui acesso ativo à Consultoria.' };
+  }
+  const cache = CacheService.getScriptCache();
+  if (cache.get('consultoria-otp-rate:' + email)) {
+    return { ok: false, error: 'Aguarde um minuto antes de solicitar outro código.' };
+  }
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  cache.put('consultoria-otp:' + email, JSON.stringify({ code: code, attempts: 0 }), 600);
+  cache.put('consultoria-otp-rate:' + email, '1', 60);
+  sendPatientEmail_(email, 'Seu código de acesso - Consultoria Regiane Silva',
+    'Oi, ' + (paciente.Nome || '') + '!\n\nSeu código de acesso à Área da Consultoria é: ' + code + '\n\nEle vale por 10 minutos e pode ser usado uma vez. Se você não solicitou este código, ignore esta mensagem.\n\nRegiane Silva');
+  return { ok: true, email: email };
+}
+
+function actionVerifyConsultoriaAccessCode(body) {
+  const email = normEmail(body.email);
+  const code = String(body.code || '').replace(/\D/g, '');
+  if (!email || code.length !== 6) return { ok: false, error: 'Informe o e-mail e o código de seis dígitos.' };
+  const paciente = findConsultoriaRow(email);
+  if (!paciente || String(paciente.Liberado).trim().toLowerCase() !== 'sim') return { ok: false, error: 'Acesso não autorizado.' };
+  const cache = CacheService.getScriptCache();
+  const key = 'consultoria-otp:' + email;
+  const raw = cache.get(key);
+  if (!raw) return { ok: false, error: 'Código expirado. Solicite um novo código.' };
+  const record = JSON.parse(raw);
+  record.attempts = Number(record.attempts || 0) + 1;
+  if (record.attempts > 5) {
+    cache.remove(key);
+    return { ok: false, error: 'Muitas tentativas. Solicite um novo código.' };
+  }
+  if (String(record.code) !== code) {
+    cache.put(key, JSON.stringify(record), 600);
+    return { ok: false, error: 'Código incorreto.' };
+  }
+  cache.remove(key);
+  const accessToken = Utilities.getUuid() + Utilities.getUuid();
+  cache.put('consultoria-session:' + accessToken, JSON.stringify({ email: email, nome: paciente.Nome || email }), 21600);
+  return { ok: true, email: email, nome: paciente.Nome || email, accessToken: accessToken, expiresIn: 21600 };
+}
+
+function actionGoogleLoginConsultoria(body) {
+  const auth = verifyGoogleToken(body.idToken);
+  if (isAdmin(auth.email)) return { ok: true, nome: auth.nome, email: auth.email, admin: true };
+  const paciente = findConsultoriaRow(auth.email);
+  if (!paciente || String(paciente.Liberado).trim().toLowerCase() !== 'sim') {
+    return { ok: false, error: 'Não encontramos uma consultoria ativa para esta conta Google. Fale com a Regiane.' };
+  }
+  return { ok: true, nome: paciente.Nome || auth.nome, email: paciente.Email, admin: false };
+}
+
+function actionConsultoriaDashboard(body) {
+  const identity = consultoriaEmailFromToken_(body);
+  const paciente = findConsultoriaRow(identity.email);
+  if (!paciente) {
+    if (isAdmin(identity.auth.email)) return { ok: true, nome: 'Administradora', admin: true, respondeu: false, respostas: null };
+    return { ok: false, error: 'Paciente da consultoria não encontrada.' };
+  }
+  if (!isAdmin(identity.auth.email) && String(paciente.Liberado).trim().toLowerCase() !== 'sim') {
+    return { ok: false, error: 'Seu acesso à consultoria não está liberado.' };
+  }
+  let respostas = null;
+  try { respostas = paciente.RespostasAnamnese ? JSON.parse(paciente.RespostasAnamnese) : null; } catch (err) { respostas = null; }
+  return {
+    ok: true, nome: paciente.Nome || '', email: paciente.Email,
+    admin: isAdmin(identity.auth.email),
+    liberado: String(paciente.Liberado).trim().toLowerCase() === 'sim',
+    respondeu: !!paciente.DataResposta, dataResposta: paciente.DataResposta || '', respostas: respostas
+  };
+}
+
+function formatConsultoriaRespostas_(respostas) {
+  const labels = {
+    modalidade: 'Modalidade da consultoria', objetivo: 'Objetivo principal',
+    medicamentos: 'Medicamentos e suplementos', patologias: 'Diagnósticos, patologias ou condições de saúde',
+    intestino: 'Funcionamento do intestino', alergias: 'Alergias e intolerâncias alimentares',
+    preferencias: 'Preferências e alimentos que não consome', cafe: 'Café da manhã atual',
+    almoco: 'Almoço atual', lanche: 'Lanches atuais', jantar: 'Jantar atual',
+    outros: 'Outras informações importantes'
+  };
+  return Object.keys(labels).map(function(key) {
+    return labels[key] + ': ' + String(respostas[key] || 'Não informado');
+  }).join('\n');
+}
+
+function actionSubmitConsultoriaAnamnese(body) {
+  const identity = consultoriaEmailFromToken_(body);
+  if (isAdmin(identity.auth.email) && identity.email === identity.auth.email) {
+    return { ok: false, error: 'Selecione uma paciente para responder como paciente.' };
+  }
+  const paciente = findConsultoriaRow(identity.email);
+  if (!paciente || String(paciente.Liberado).trim().toLowerCase() !== 'sim') return { ok: false, error: 'Acesso à consultoria não liberado.' };
+  const respostas = body.respostas || {};
+  if (!String(respostas.objetivo || '').trim()) return { ok: false, error: 'Informe seu objetivo principal.' };
+  if (!String(respostas.intestino || '').trim()) return { ok: false, error: 'Conte como está o funcionamento do seu intestino.' };
+  if (!String(respostas.cafe || '').trim() || !String(respostas.almoco || '').trim() || !String(respostas.jantar || '').trim()) {
+    return { ok: false, error: 'Preencha café da manhã, almoço e jantar atuais.' };
+  }
+
+  const now = new Date();
+  const sheet = getSheet('ConsultoriaPacientes');
+  const headers = sheet.getDataRange().getValues()[0];
+  sheet.getRange(paciente._row, headers.indexOf('RespostasAnamnese') + 1).setValue(JSON.stringify(respostas));
+  sheet.getRange(paciente._row, headers.indexOf('DataResposta') + 1).setValue(now);
+
+  const history = getSheet('ConsultoriaRespostas');
+  history.appendRow([
+    'consultoria-' + now.getTime(), identity.email, paciente.Nome || identity.auth.nome || '', now,
+    sheetLiteral_(respostas.modalidade), sheetLiteral_(respostas.objetivo), sheetLiteral_(respostas.medicamentos),
+    sheetLiteral_(respostas.patologias), sheetLiteral_(respostas.intestino), sheetLiteral_(respostas.alergias),
+    sheetLiteral_(respostas.preferencias), sheetLiteral_(respostas.cafe), sheetLiteral_(respostas.almoco),
+    sheetLiteral_(respostas.lanche), sheetLiteral_(respostas.jantar), sheetLiteral_(respostas.outros)
+  ]);
+
+  const resumo = formatConsultoriaRespostas_(respostas);
+  let emailPacienteEnviado = false;
+  try {
+    sendPatientEmail_(identity.email, 'Suas respostas para a Consultoria Nutricional - Regiane Silva',
+      'Oi, ' + (paciente.Nome || identity.auth.nome || '') + '!\n\nRecebemos suas informações para preparar a consultoria. Confira a cópia abaixo:\n\n' + resumo + '\n\nAté a nossa consultoria!\nRegiane Silva');
+    emailPacienteEnviado = true;
+  } catch (err) {}
+  const emailRegianeEnviado = notifyRegiane(
+    'Anamnese da Consultoria respondida - ' + (paciente.Nome || identity.email),
+    (paciente.Nome || identity.email) + ' (' + identity.email + ') respondeu à preparação da consultoria.\n\n' + resumo
+  );
+  return { ok: true, dataResposta: now, emailPacienteEnviado: emailPacienteEnviado, emailRegianeEnviado: emailRegianeEnviado };
+}
+
+function actionAdminListConsultoriaPatients(body) {
+  assertAdmin(body.idToken);
+  return {
+    ok: true,
+    pacientes: sheetToObjects(getSheet('ConsultoriaPacientes')).map(function(p) {
+      let respostas = null;
+      try { respostas = p.RespostasAnamnese ? JSON.parse(p.RespostasAnamnese) : null; } catch (err) { respostas = null; }
+      return { email: p.Email, nome: p.Nome, liberado: String(p.Liberado).trim().toLowerCase() === 'sim', dataResposta: p.DataResposta || '', respostas: respostas };
+    })
+  };
+}
+
+function actionAdminAddConsultoriaPatient(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const nome = String(body.nome || '').trim();
+  if (!email || email.indexOf('@') === -1 || !nome) return { ok: false, error: 'Informe nome e e-mail válido.' };
+  const sheet = getSheet('ConsultoriaPacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, headers.indexOf('Nome') + 1).setValue(nome);
+      sheet.getRange(i + 1, headers.indexOf('Liberado') + 1).setValue('Sim');
+      sheet.getRange(i + 1, headers.indexOf('DataLiberacao') + 1).setValue(new Date());
+      return { ok: true, created: false };
+    }
+  }
+  sheet.appendRow([email, nome, new Date(), 'Sim', '', '']);
+  return { ok: true, created: true };
+}
+
+function actionAdminSetConsultoriaAccess(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  const sheet = getSheet('ConsultoriaPacientes');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === email) {
+      sheet.getRange(i + 1, headers.indexOf('Liberado') + 1).setValue(body.liberado ? 'Sim' : 'Não');
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Paciente da consultoria não encontrada.' };
+}
+
 // ── LINK NA BIO (biolink.html) ───────────────────────────
 
 /** Mantém dados enviados pelo público como texto literal na planilha.
@@ -1812,6 +2061,14 @@ function setupSheetStructure() {
     ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'RespostasChecklist', 'RespostasQuiz', 'DataCheckup'],
     ['exemplo@checkup.com', 'Nome de Exemplo', new Date(), 'Sim', 'Não', '', '', '']);
 
+  buildSheet('ConsultoriaPacientes',
+    ['Email', 'Nome', 'DataLiberacao', 'Liberado', 'RespostasAnamnese', 'DataResposta'],
+    null);
+
+  buildSheet('ConsultoriaRespostas',
+    ['Id', 'Email', 'Nome', 'DataResposta', 'Modalidade', 'Objetivo', 'MedicamentosSuplementos', 'PatologiasCondicoes', 'Intestino', 'AlergiasIntolerancias', 'Preferencias', 'CafeDaManha', 'Almoco', 'Lanches', 'Jantar', 'OutrasInformacoes'],
+    null);
+
   buildSheet('BioLeadsQuiz',
     ['Data', 'Nome', 'Telefone', 'Momento', 'Sintoma', 'Mensagem', 'RecomendacaoSugerida', 'AvisoEnviadoEm', 'StatusAviso', 'TentativasAviso'],
     null);
@@ -1827,7 +2084,7 @@ function setupSheetStructure() {
   });
 
   // ordena as abas na ordem que faz mais sentido pro dia a dia da Regiane
-  const ordem = ['Pacientes', 'CheckupPacientes', 'Rotinas', 'Notificacoes', 'Materiais', 'Agendamentos', 'Comentarios', 'Fotos', 'PontosLog', 'Creditos', 'BioLeadsQuiz', 'BioNewsletter'];
+  const ordem = ['Pacientes', 'CheckupPacientes', 'ConsultoriaPacientes', 'ConsultoriaRespostas', 'Rotinas', 'Notificacoes', 'Materiais', 'Agendamentos', 'Comentarios', 'Fotos', 'PontosLog', 'Creditos', 'BioLeadsQuiz', 'BioNewsletter'];
   ordem.forEach((nome, i) => {
     const s = ss.getSheetByName(nome);
     if (s) ss.setActiveSheet(s);
