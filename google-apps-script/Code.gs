@@ -758,7 +758,7 @@ function actionAdminAddMaterial(body) {
   if (!link || !titulo) return { ok: false, error: 'Preencha pelo menos o título e o link.' };
   if (!isValidPublicLink_(link)) return { ok: false, error: 'Informe um link completo e válido, começando com https://.' };
 
-  const areasValidas = ['aulas', 'rotulo', 'materiais'];
+  const areasValidas = ['aulas', 'rotulo', 'materiais', 'consultoria'];
   const area = areasValidas.indexOf(body.area) !== -1 ? body.area : 'materiais';
   const tipoPadrao = area === 'materiais' ? 'Material' : 'Vídeo';
 
@@ -1739,8 +1739,17 @@ function actionGoogleLoginConsultoria(body) {
 function actionConsultoriaDashboard(body) {
   const identity = consultoriaEmailFromToken_(body);
   const paciente = findConsultoriaRow(identity.email);
+  const materiais = sheetToObjects(getSheet('Materiais')).filter(function(m) {
+    const area = String(m.Area || '').trim().toLowerCase();
+    const destino = normEmail(m.Email);
+    return area === 'consultoria' &&
+      (destino === 'consultoria' || destino === 'todos' || destino === identity.email) &&
+      isValidPublicLink_(m.Link);
+  }).map(function(m) {
+    return { id: m.Id, titulo: m.Titulo || 'Vídeo da Regiane', descricao: m.Descricao || '', link: m.Link, tipo: m.Tipo || 'Vídeo' };
+  });
   if (!paciente) {
-    if (isAdmin(identity.auth.email)) return { ok: true, nome: 'Administradora', admin: true, respondeu: false, respostas: null };
+    if (isAdmin(identity.auth.email)) return { ok: true, nome: 'Administradora', admin: true, respondeu: false, respostas: null, materiais: materiais };
     return { ok: false, error: 'Paciente da consultoria não encontrada.' };
   }
   if (!isAdmin(identity.auth.email) && String(paciente.Liberado).trim().toLowerCase() !== 'sim') {
@@ -1752,7 +1761,7 @@ function actionConsultoriaDashboard(body) {
     ok: true, nome: paciente.Nome || '', email: paciente.Email,
     admin: isAdmin(identity.auth.email),
     liberado: String(paciente.Liberado).trim().toLowerCase() === 'sim',
-    respondeu: !!paciente.DataResposta, dataResposta: paciente.DataResposta || '', respostas: respostas
+    respondeu: !!paciente.DataResposta, dataResposta: paciente.DataResposta || '', respostas: respostas, materiais: materiais
   };
 }
 
