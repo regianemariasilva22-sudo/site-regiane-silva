@@ -67,6 +67,8 @@ context.verifyGoogleToken = token => {
 assert.strictEqual(context.setupConsultoriaSheets().ok, true);
 assert.ok(spreadsheet.getSheetByName('ConsultoriaPacientes'));
 assert.ok(spreadsheet.getSheetByName('ConsultoriaRespostas'));
+const materiais = spreadsheet.insertSheet('Materiais');
+materiais.appendRow(['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area']);
 
 const added = context.actionAdminAddConsultoriaPatient({ idToken: 'admin', nome: 'Paciente Teste', email: 'paciente.teste@example.com' });
 assert.strictEqual(added.ok, true);
