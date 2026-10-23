@@ -266,6 +266,10 @@ function doPost(e) {
     if (action === 'adminListConsultoriaPatients') return jsonResponse(actionAdminListConsultoriaPatients(body));
     if (action === 'adminAddConsultoriaPatient') return jsonResponse(actionAdminAddConsultoriaPatient(body));
     if (action === 'adminSetConsultoriaAccess') return jsonResponse(actionAdminSetConsultoriaAccess(body));
+    if (action === 'financeiroLoad') return jsonResponse(actionFinanceiroLoad(body));
+    if (action === 'financeiroSavePatient') return jsonResponse(actionFinanceiroSavePatient(body));
+    if (action === 'financeiroSaveAppointment') return jsonResponse(actionFinanceiroSaveAppointment(body));
+    if (action === 'financeiroSaveConfig') return jsonResponse(actionFinanceiroSaveConfig(body));
     if (action === 'bioLead') return jsonResponse(actionBioLead(body));
     return jsonResponse({ ok: false, error: 'Ação inválida: ' + action });
   } catch (err) {
@@ -2101,4 +2105,190 @@ function setupSheetStructure() {
   });
 
   SpreadsheetApp.flush();
+}
+
+// ── FINANCEIRO DA CLÍNICA ───────────────────────────────
+// Dados permanentes do sistema financeiro. Nenhuma rota desta área exclui
+// pacientes ou atendimentos: as alterações são sempre inclusão/atualização.
+function ensureFinanceiroSheets_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const specs = {
+    pacientes: ['Id', 'Email', 'Nome', 'Servico', 'ValorContratado', 'Origem', 'CadastroPendente', 'CriadoEm', 'AtualizadoEm'],
+    atendimentos: ['Id', 'PacienteId', 'Email', 'Servico', 'Encontro', 'DataHora', 'Valor', 'Recebido', 'Status', 'CreditoMantido', 'Reagendamentos', 'OrigemAgenda', 'AlocacaoJson', 'CriadoEm', 'AtualizadoEm'],
+    config: ['Chave', 'Valor', 'AtualizadoEm', 'AdminEmail']
+  };
+  const result = {};
+  Object.keys(specs).forEach(function(key) {
+    const name = key === 'pacientes' ? 'FinanceiroPacientes' : key === 'atendimentos' ? 'FinanceiroAtendimentos' : 'FinanceiroConfig';
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) sheet = ss.insertSheet(name);
+    ensureHeaders_(sheet, specs[key]);
+    sheet.setFrozenRows(1);
+    result[key] = sheet;
+  });
+  return result;
+}
+
+function financeiroService_(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw.indexOf('check') !== -1) return 'Check-up';
+  if (raw.indexOf('consultoria') !== -1) return 'Consultoria';
+  if (raw.indexOf('dupla') !== -1) return 'Consulta Dupla';
+  if (raw.indexOf('reequil') !== -1 || raw.indexOf('programa') !== -1) return 'Programa Reequilíbrio';
+  if (raw.indexOf('acompanh') !== -1 || raw.indexOf('mentoria') !== -1) return 'Acompanhamento de 5 meses';
+  throw new Error('Serviço financeiro inválido.');
+}
+
+function syncFinanceiroPatientsFromSources_(sheets) {
+  const target = sheets.pacientes;
+  const existing = sheetToObjects(target);
+  const keys = {};
+  existing.forEach(function(p) { keys[normEmail(p.Email) + '|' + String(p.Servico || '').toLowerCase()] = true; });
+  const sources = [
+    { sheet: 'Pacientes', service: 'Programa Reequilíbrio', price: '' },
+    { sheet: 'ConsultoriaPacientes', service: 'Consultoria', price: '' },
+    { sheet: 'CheckupPacientes', service: 'Check-up', price: 47.90 }
+  ];
+  sources.forEach(function(source) {
+    sheetToObjects(getSheet(source.sheet)).forEach(function(p) {
+      const email = normEmail(p.Email);
+      if (!email || email.indexOf('@') === -1 || email.indexOf('exemplo@') === 0) return;
+      const key = email + '|' + source.service.toLowerCase();
+      if (keys[key]) return;
+      const now = new Date();
+      target.appendRow([Utilities.getUuid(), email, p.Nome || email, source.service, source.price, source.sheet, source.price === '' ? 'Sim' : 'Não', now, now]);
+      keys[key] = true;
+    });
+  });
+}
+
+function financeiroConfigDefaults_() {
+  return { reserve: 15, invest: 15, prolabore: 30, operation: 40, noticeDays: 7, total: 500, meeting: 250, deposit: 100, credit: 30, rescheduleLimit: 1 };
+}
+
+function readFinanceiroConfig_(sheet) {
+  const config = financeiroConfigDefaults_();
+  sheetToObjects(sheet).forEach(function(row) {
+    if (Object.prototype.hasOwnProperty.call(config, row.Chave)) config[row.Chave] = Number(row.Valor);
+  });
+  return config;
+}
+
+function financeiroPatientOutput_(p) {
+  return {
+    id: String(p.Id || ''), email: normEmail(p.Email), name: String(p.Nome || ''),
+    service: String(p.Servico || ''), value: Number(p.ValorContratado) || 0,
+    source: String(p.Origem || ''), pending: String(p.CadastroPendente || '').toLowerCase() === 'sim'
+  };
+}
+
+function financeiroAppointmentOutput_(a) {
+  let allocation = null;
+  try { allocation = a.AlocacaoJson ? JSON.parse(String(a.AlocacaoJson)) : null; } catch (err) {}
+  return {
+    id: String(a.Id || ''), patient: String(a.PacienteId || ''), email: normEmail(a.Email),
+    service: String(a.Servico || ''), meeting: String(a.Encontro || ''),
+    date: a.DataHora instanceof Date ? a.DataHora.toISOString() : String(a.DataHora || ''),
+    value: Number(a.Valor) || 0, paid: Number(a.Recebido) || 0, status: String(a.Status || 'agendado'),
+    creditEligible: String(a.CreditoMantido || '').toLowerCase() === 'sim', reschedules: Number(a.Reagendamentos) || 0,
+    calendarSource: String(a.OrigemAgenda || 'manual'), allocation: allocation
+  };
+}
+
+function actionFinanceiroLoad(body) {
+  const admin = assertAdmin(body.idToken);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheets = ensureFinanceiroSheets_();
+    syncFinanceiroPatientsFromSources_(sheets);
+    return {
+      ok: true,
+      admin: { email: admin.email, nome: admin.nome },
+      patients: sheetToObjects(sheets.pacientes).map(financeiroPatientOutput_),
+      appointments: sheetToObjects(sheets.atendimentos).map(financeiroAppointmentOutput_),
+      config: readFinanceiroConfig_(sheets.config)
+    };
+  } finally { lock.releaseLock(); }
+}
+
+function actionFinanceiroSavePatient(body) {
+  assertAdmin(body.idToken);
+  const item = body.patient || {};
+  const email = normEmail(item.email);
+  const name = String(item.name || '').trim();
+  if (!email || email.indexOf('@') === -1 || !name) throw new Error('Informe nome e e-mail válidos.');
+  const service = financeiroService_(item.service);
+  const id = String(item.id || Utilities.getUuid());
+  const sheet = ensureFinanceiroSheets_().pacientes;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('Id');
+  const now = new Date();
+  const values = { Id:id, Email:email, Nome:name, Servico:service, ValorContratado:Number(item.value)||0, Origem:item.source||'Sistema financeiro', CadastroPendente:'Não', AtualizadoEm:now };
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === id) {
+      headers.forEach(function(h, c) { if (values[h] !== undefined) sheet.getRange(i + 1, c + 1).setValue(values[h]); });
+      return { ok:true, patientId:id };
+    }
+  }
+  sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
+  return { ok:true, patientId:id };
+}
+
+function actionFinanceiroSaveAppointment(body) {
+  assertAdmin(body.idToken);
+  const item = body.appointment || {};
+  const id = String(item.id || Utilities.getUuid());
+  const patientId = String(item.patient || '');
+  const date = new Date(item.date);
+  if (!patientId || isNaN(date.getTime())) throw new Error('Paciente ou data do atendimento inválida.');
+  const service = financeiroService_(item.service);
+  const sheets = ensureFinanceiroSheets_();
+  const patient = sheetToObjects(sheets.pacientes).map(financeiroPatientOutput_).filter(function(p) { return p.id === patientId; })[0];
+  if (!patient) throw new Error('Paciente financeiro não encontrado.');
+  const sheet = sheets.atendimentos;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('Id');
+  const now = new Date();
+  const values = {
+    Id:id, PacienteId:patientId, Email:patient.email, Servico:service,
+    Encontro:service === 'Consulta Dupla' ? String(item.meeting || '') : '', DataHora:date,
+    Valor:Number(item.value)||0, Recebido:Number(item.paid)||0, Status:String(item.status||'agendado'),
+    CreditoMantido:item.creditEligible ? 'Sim' : 'Não', Reagendamentos:Number(item.reschedules)||0,
+    OrigemAgenda:String(item.calendarSource||'manual'), AlocacaoJson:item.allocation ? JSON.stringify(item.allocation) : '', AtualizadoEm:now
+  };
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === id) {
+      headers.forEach(function(h, c) { if (values[h] !== undefined) sheet.getRange(i + 1, c + 1).setValue(values[h]); });
+      return { ok:true, appointmentId:id };
+    }
+  }
+  sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
+  return { ok:true, appointmentId:id };
+}
+
+function actionFinanceiroSaveConfig(body) {
+  const admin = assertAdmin(body.idToken);
+  const input = body.config || {};
+  const allowed = financeiroConfigDefaults_();
+  const sheet = ensureFinanceiroSheets_().config;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const keyCol = headers.indexOf('Chave');
+  Object.keys(allowed).forEach(function(key) {
+    if (input[key] === undefined) return;
+    const value = Number(input[key]);
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][keyCol]) === key) {
+        sheet.getRange(i + 1, 2, 1, 3).setValues([[value, new Date(), admin.email]]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) sheet.appendRow([key, value, new Date(), admin.email]);
+  });
+  return { ok:true };
 }
