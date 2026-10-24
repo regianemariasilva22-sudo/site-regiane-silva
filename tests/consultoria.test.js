@@ -104,4 +104,28 @@ const adminList = context.actionAdminListConsultoriaPatients({ idToken: 'admin' 
 assert.strictEqual(adminList.pacientes[0].respostas.objetivo, respostas.objetivo);
 assert.strictEqual(adminList.pacientes[0].liberado, false);
 
-console.log('Consultoria: cadastro, login, respostas, e-mails, histórico e remoção de acesso OK');
+const pacientes = spreadsheet.insertSheet('Pacientes');
+pacientes.appendRow(['Email', 'Nome', 'DataInicio', 'RetornosRealizados', 'ReceitasSalvas', 'ProgressoPercent', 'PontosTotal', 'Instagram']);
+const checkups = spreadsheet.insertSheet('CheckupPacientes');
+checkups.appendRow(['Email', 'Nome', 'DataLiberacao', 'Liberado', 'JaFezCheckup', 'DataCheckup', 'RespostasChecklist', 'RespostasQuiz']);
+
+const financialCases = [
+  { id: 'fin-consultoria', email: 'consultoria@example.com', service: 'Consultoria', sheet: 'ConsultoriaPacientes' },
+  { id: 'fin-checkup', email: 'checkup@example.com', service: 'Check-up', sheet: 'CheckupPacientes' },
+  { id: 'fin-dupla', email: 'dupla@example.com', service: 'Consulta Dupla', sheet: 'Pacientes' },
+  { id: 'fin-programa', email: 'programa@example.com', service: 'Programa Reequilíbrio', sheet: 'Pacientes' },
+  { id: 'fin-acompanhamento', email: 'acompanhamento@example.com', service: 'Acompanhamento de 5 meses', sheet: 'Pacientes' }
+];
+financialCases.forEach(item => {
+  const result = context.actionFinanceiroSavePatient({
+    idToken: 'admin',
+    patient: { id: item.id, email: item.email, name: 'Paciente ' + item.id, service: item.service, value: 100 }
+  });
+  assert.strictEqual(result.ok, true);
+  const target = spreadsheet.getSheetByName(item.sheet);
+  const emailCol = target.rows[0].indexOf('Email');
+  assert.ok(target.rows.slice(1).some(row => row[emailCol] === item.email), item.service + ' não liberou ' + item.sheet);
+});
+assert.strictEqual(spreadsheet.getSheetByName('FinanceiroPacientes').rows.length, financialCases.length + 1);
+
+console.log('Consultoria e financeiro: cadastro, áreas corretas, login, respostas, e-mails e histórico OK');

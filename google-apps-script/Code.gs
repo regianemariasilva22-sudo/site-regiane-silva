@@ -2212,6 +2212,28 @@ function actionFinanceiroLoad(body) {
   } finally { lock.releaseLock(); }
 }
 
+/**
+ * Libera a área de membros correspondente ao serviço escolhido no financeiro.
+ * A operação é idempotente: se o e-mail já existir, atualiza o nome e reativa
+ * o acesso. Nunca remove automaticamente um acesso anterior nem apaga histórico.
+ */
+function syncMemberAccessFromFinance_(body, service, email, name) {
+  const accessBody = { idToken: body.idToken, email: email, nome: name };
+  if (service === 'Consultoria') {
+    const result = actionAdminAddConsultoriaPatient(accessBody);
+    if (!result.ok) throw new Error(result.error || 'Não foi possível liberar a Consultoria.');
+    return { area: 'consultoria', created: !!result.created };
+  }
+  if (service === 'Check-up') {
+    const result = actionAdminAddCheckupPatient(accessBody);
+    if (!result.ok) throw new Error(result.error || 'Não foi possível liberar o Check-up.');
+    return { area: 'checkup', created: !!result.created };
+  }
+  const result = actionAdminAddPatient(accessBody);
+  if (!result.ok) throw new Error(result.error || 'Não foi possível liberar a Área de Pacientes.');
+  return { area: 'programa', created: !!result.created };
+}
+
 function actionFinanceiroSavePatient(body) {
   assertAdmin(body.idToken);
   const item = body.patient || {};
@@ -2226,14 +2248,17 @@ function actionFinanceiroSavePatient(body) {
   const idCol = headers.indexOf('Id');
   const now = new Date();
   const values = { Id:id, Email:email, Nome:name, Servico:service, ValorContratado:Number(item.value)||0, Origem:item.source||'Sistema financeiro', CadastroPendente:'Não', AtualizadoEm:now };
+  let created = true;
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idCol]) === id) {
       headers.forEach(function(h, c) { if (values[h] !== undefined) sheet.getRange(i + 1, c + 1).setValue(values[h]); });
-      return { ok:true, patientId:id };
+      created = false;
+      break;
     }
   }
-  sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
-  return { ok:true, patientId:id };
+  if (created) sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
+  const memberAccess = syncMemberAccessFromFinance_(body, service, email, name);
+  return { ok:true, patientId:id, created:created, memberAccess:memberAccess };
 }
 
 function actionFinanceiroSaveAppointment(body) {
