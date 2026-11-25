@@ -101,7 +101,7 @@ document.getElementById('mem-user-name').textContent=(sessionStorage.getItem('rs
 if(isImpersonating){document.getElementById('impersonate-banner').style.display='flex';document.getElementById('impersonate-name').textContent=impersonateEmail;document.getElementById('mem-user-name').textContent=impersonateEmail.split('@')[0];}
 document.getElementById('logout').addEventListener('click',e=>{e.preventDefault();['rs_consultoria_email','rs_consultoria_nome','rs_consultoria_admin','rs_consultoria_idtoken','rs_consultoria_access_token'].forEach(k=>sessionStorage.removeItem(k));location.href='login.html';});
 function consultoriaAuth(){return patientIdToken?{idToken:patientIdToken}:{accessToken:patientAccessToken};}
-function showTab(name){document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));const tab=document.getElementById('tab-'+name);if(tab)tab.style.display='block';if(name==='admin')loadAdmin();window.scrollTo({top:0,behavior:'smooth'});}
+function showTab(name){if(name==='admin'&&!isAdminUser)name='inicio';document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));const tab=document.getElementById('tab-'+name);if(tab)tab.style.display='block';if(name==='admin')loadAdmin();window.scrollTo({top:0,behavior:'smooth'});}
 const VIDEOS=[
  {id:'ys9cWQ8lnD0',titulo:'27 de agosto de 2026'},
  {id:'qGyBqw2VRxU',titulo:'Orientação da Regiane — vídeo 1'},

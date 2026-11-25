@@ -452,6 +452,7 @@
   }
 
   function showTab(name){
+    if(name==='admin'&&!isAdminUser) name='inicio';
     document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
     const tab = document.getElementById('tab-'+name);

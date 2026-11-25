@@ -427,7 +427,7 @@
       </div>
 
       <h3 style="margin-top:34px;margin-bottom:16px;">Agendar novo retorno</h3>
-      <p class="card-text" style="margin-bottom:16px;">Horários direto da agenda da Regiane — ao escolher, a consulta já fica confirmada na hora.</p>
+      <p class="card-text" style="margin-bottom:16px;">Escolha um horário para enviar sua solicitação. Ele ficará pendente até a Regiane confirmar; só então a consulta será adicionada à sua agenda.</p>
       <div class="mem-panel" id="calendario-slots">
         <p class="card-text" style="color:var(--muted);">Carregando horários disponíveis...</p>
       </div>
@@ -540,6 +540,7 @@
   const loggedInEmail = sessionStorage.getItem('rs_programa_email');
   const patientIdToken = sessionStorage.getItem('rs_programa_idtoken');
   const isAdminUser = sessionStorage.getItem('rs_programa_admin') === '1';
+  let pendingAppointmentStatusRefresh = false;
   const impersonateEmail = urlParams.get('as');
   const isImpersonating = !!(impersonateEmail && isAdminUser);
   const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
@@ -588,6 +589,7 @@
     }, 3 * 60 * 1000);
   }
   function showTab(name){
+    if(name==='admin'&&!isAdminUser) name='inicio';
     document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
     const tab = document.getElementById('tab-'+name);
@@ -612,6 +614,7 @@
     if(!apiConfigured() || !patientEmail || !patientIdToken) return;
     const d = await apiPost('patientDashboard', { idToken: patientIdToken, email: patientEmail });
     if(!d.ok) return;
+    pendingAppointmentStatusRefresh = d.agendamentoStatus === 'solicitado';
 
     if(d.nome) document.getElementById('hello-title').textContent = 'Olá, ' + d.nome.split(' ')[0] + ' 🌿';
     document.getElementById('stat-dias').textContent = d.diasAcompanhamento;
@@ -639,7 +642,11 @@
         tag.textContent = 'Confirmado';
         tag.style.background = 'var(--rose-mist)';
         tag.style.color = 'var(--marsala-deep)';
+      } else {
+        tag.style.display = 'none';
       }
+    } else {
+      document.getElementById('proximo-retorno-tag').style.display = 'none';
     }
 
     document.getElementById('pontos-total').textContent = d.pontosTotal;
@@ -737,6 +744,7 @@
     if(window.__rebindCursor) window.__rebindCursor();
   }
   loadDashboardData();
+  setInterval(()=>{ if(pendingAppointmentStatusRefresh) loadDashboardData(); }, 60000);
 
   async function downloadMemberMaterial(materialId){
     const result = await apiPost('patientMaterialFile', { idToken: patientIdToken, email: patientEmail, area: 'programa', materialId });
