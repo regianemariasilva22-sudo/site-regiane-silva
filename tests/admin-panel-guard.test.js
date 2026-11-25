@@ -50,7 +50,9 @@ for (const file of dashboards) {
 }
 
 const program = fs.readFileSync('membros/programa/dashboard.html', 'utf8');
+const backend = fs.readFileSync('google-apps-script/Code.gs', 'utf8');
 assert.match(program, /Escolha um horário para enviar sua solicitação\. Ele ficará pendente até a Regiane confirmar/);
 assert.match(program, /setInterval\(\(\)=>\{ if\(pendingAppointmentStatusRefresh\) loadDashboardData\(\); \}, 60000\)/);
+assert.match(backend, /\['solicitado', 'confirmado'\]\.indexOf\(String\(a\.Status\)\.trim\(\)\.toLowerCase\(\)\)/);
 
 console.log('Aba administrativa bloqueada para pacientes nos três painéis; agenda informa pendência e atualiza o status.');

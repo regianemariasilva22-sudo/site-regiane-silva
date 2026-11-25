@@ -351,7 +351,9 @@ function actionDashboard(email) {
 
   // próxima solicitação/consulta desta paciente (a mais próxima no futuro)
   const meusAgendamentos = sheetToObjects(getSheet('Agendamentos'))
-    .filter(a => normEmail(a.Email) === normEmail(email) && a.IsoInicio && new Date(a.IsoInicio) > new Date())
+    .filter(a => normEmail(a.Email) === normEmail(email) && a.IsoInicio &&
+      ['solicitado', 'confirmado'].indexOf(String(a.Status).trim().toLowerCase()) !== -1 &&
+      new Date(a.IsoInicio) > new Date())
     .sort((a, b) => new Date(a.IsoInicio) - new Date(b.IsoInicio));
   const proximoAgendamento = meusAgendamentos[0] || null;
 
