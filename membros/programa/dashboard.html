@@ -462,6 +462,13 @@
           <select id="mat-destino" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">
             <option value="todos">Todas as pacientes</option>
           </select>
+          <select id="mat-release-mode" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;">
+            <option value="now">Disponibilizar imediatamente</option>
+            <option value="days">Liberar após um número de dias do início do acesso</option>
+            <option value="date">Liberar em uma data específica</option>
+          </select>
+          <div id="mat-release-days-wrap" style="display:none;"><label for="mat-release-days" class="card-text">Dias após a entrada da paciente na plataforma</label><input type="number" id="mat-release-days" min="1" max="3650" step="1" placeholder="Ex.: 7" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" /></div>
+          <div id="mat-release-date-wrap" style="display:none;"><label for="mat-release-date" class="card-text">Data em que o material ficará disponível</label><input type="date" id="mat-release-date" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;font-size:13.5px;" /></div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
           <button type="button" class="btn btn-primary btn-sm" id="mat-add-btn">Adicionar</button>
@@ -705,9 +712,12 @@
           card.querySelector('.card-num').textContent = m.tipo || 'Material';
           card.querySelector('.card-title').textContent = m.titulo || '';
           card.querySelector('.card-text').textContent = m.descricao || '';
-          if(m.link){
+          if(m.file){
+            card.querySelector('.card-text').textContent = (m.descricao ? m.descricao + ' · ' : '') + 'PDF · clique para baixar';
+            card.addEventListener('click', ()=>downloadMemberMaterial(m.id));
+          } else if(m.link){
             card.style.cursor = 'none';
-            card.addEventListener('click', ()=>window.open(m.link, '_blank'));
+            card.addEventListener('click', ()=>window.open(m.link, '_blank', 'noopener'));
           }
           wrap.appendChild(card);
         });
@@ -727,6 +737,15 @@
     if(window.__rebindCursor) window.__rebindCursor();
   }
   loadDashboardData();
+
+  async function downloadMemberMaterial(materialId){
+    const result = await apiPost('patientMaterialFile', { idToken: patientIdToken, email: patientEmail, area: 'programa', materialId });
+    if(!result.ok){ window.alert(result.error || 'Não foi possível abrir este material.'); return; }
+    const bytes = Uint8Array.from(atob(result.fileBase64), c=>c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: result.mimeType || 'application/pdf' }));
+    const a = document.createElement('a'); a.href = url; a.download = result.fileName || 'material.pdf'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  }
 
   const patientInstagramSave = document.getElementById('patient-instagram-save');
   if(patientInstagramSave){
@@ -1354,6 +1373,12 @@
   }
 
   const matAddBtn = document.getElementById('mat-add-btn');
+  const matReleaseMode = document.getElementById('mat-release-mode');
+  function updateMaterialReleaseFields(){
+    document.getElementById('mat-release-days-wrap').style.display = matReleaseMode.value === 'days' ? 'block' : 'none';
+    document.getElementById('mat-release-date-wrap').style.display = matReleaseMode.value === 'date' ? 'block' : 'none';
+  }
+  if(matReleaseMode){ matReleaseMode.addEventListener('change', updateMaterialReleaseFields); updateMaterialReleaseFields(); }
   if(matAddBtn){
     matAddBtn.addEventListener('click', async ()=>{
       const area = document.getElementById('mat-area').value;
@@ -1362,11 +1387,16 @@
       const link = document.getElementById('mat-link').value.trim();
       const descricao = document.getElementById('mat-descricao').value.trim();
       const destino = document.getElementById('mat-destino').value;
+      const releaseMode = matReleaseMode.value;
+      const releaseDays = releaseMode === 'days' ? document.getElementById('mat-release-days').value : 0;
+      const releaseDate = releaseMode === 'date' ? document.getElementById('mat-release-date').value : '';
       const status = document.getElementById('mat-add-status');
       if(!titulo || !link){ status.textContent = 'Preencha o título e o link.'; return; }
+      if(releaseMode === 'days' && (!releaseDays || Number(releaseDays) < 1)){ status.textContent = 'Informe quantos dias após a entrada da paciente o material será liberado.'; return; }
+      if(releaseMode === 'date' && !releaseDate){ status.textContent = 'Escolha a data de liberação.'; return; }
       matAddBtn.disabled = true;
       status.textContent = 'Adicionando...';
-      const r = await apiPost('adminAddMaterial', { idToken: patientIdToken, titulo, link, descricao, tipo: categoria, area, email: destino });
+      const r = await apiPost('adminAddMaterial', { idToken: patientIdToken, titulo, link, descricao, tipo: categoria, area, email: destino, releaseDays, releaseDate });
       matAddBtn.disabled = false;
       if(r.ok){
         status.textContent = 'Adicionado ✓';
@@ -1374,6 +1404,8 @@
         document.getElementById('mat-categoria').value = '';
         document.getElementById('mat-link').value = '';
         document.getElementById('mat-descricao').value = '';
+        document.getElementById('mat-release-days').value = '';
+        document.getElementById('mat-release-date').value = '';
       } else {
         status.textContent = r.error || 'Erro ao adicionar.';
       }

@@ -217,6 +217,7 @@ function doPost(e) {
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
     if (action === 'patientDashboard') return jsonResponse(actionPatientDashboard(body));
+    if (action === 'patientMaterialFile') return jsonResponse(actionPatientMaterialFile(body));
     if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
@@ -337,10 +338,7 @@ function actionDashboard(email) {
   }
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
 
-  const materiais = sheetToObjects(getSheet('Materiais')).filter(m => {
-    const dest = normEmail(m.Email);
-    return (dest === normEmail(email) || dest === 'todos') && isValidPublicLink_(m.Link);
-  });
+  const materiais = getAvailableMaterialsForPatient_('programa', email, p.DataInicio);
 
   ensureGamificationSheets_();
   const pontosTotal = Number(p.PontosTotal) || 0;
@@ -382,9 +380,7 @@ function actionDashboard(email) {
     creditoDisponivel: credito.disponivel,
     creditoHistorico: credito.historico,
     faltamParaProximoCredito: 100 - (pontosTotal % 100),
-    materiais: materiais.map(m => ({
-      tipo: m.Tipo, titulo: m.Titulo, descricao: m.Descricao, link: m.Link, area: m.Area || 'materiais'
-    }))
+    materiais: materiais
   };
 }
 
@@ -749,27 +745,162 @@ function actionAdminUploadPlanPdf(body) {
   return { ok: false, error: 'Paciente não encontrada.' };
 }
 
+function ensureMaterialHeaders_() {
+  const sheet = getSheet('Materiais');
+  const data = sheet.getDataRange().getValues();
+  let headers = data.length ? data[0].map(String) : [];
+  if (!headers.length) {
+    headers = ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'];
+    sheet.appendRow(headers);
+  }
+  ['DriveFileId', 'DiasLiberacao', 'DataDisponibilizacao'].forEach(function(name) {
+    if (headers.indexOf(name) === -1) {
+      sheet.getRange(1, headers.length + 1).setValue(name);
+      headers.push(name);
+    }
+  });
+  return sheet;
+}
+
+function materialAreaMatches_(material, area) {
+  const materialArea = String(material.Area || 'materiais').trim().toLowerCase();
+  return area === 'consultoria' ? materialArea === 'consultoria' : materialArea !== 'consultoria';
+}
+
+function materialDestinationMatches_(material, area, email) {
+  const destination = normEmail(material.Email);
+  if (area === 'consultoria' && normEmail(email) === 'todos' && destination === 'consultoria') return true;
+  if (destination === normEmail(email) || destination === 'todos') return true;
+  return area === 'consultoria' && destination === 'consultoria';
+}
+
+function materialReleased_(material, enrollmentDate) {
+  const now = new Date();
+  const fixedDate = String(material.DataDisponibilizacao || '').trim();
+  if (fixedDate) {
+    let releaseAt;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fixedDate)) {
+      const parts = fixedDate.split('-').map(Number);
+      releaseAt = new Date(parts[0], parts[1] - 1, parts[2]);
+    } else {
+      releaseAt = new Date(fixedDate);
+    }
+    if (isNaN(releaseAt.getTime()) || now < releaseAt) return false;
+  }
+  const days = Math.max(0, Math.floor(Number(material.DiasLiberacao) || 0));
+  if (!days) return true;
+  if (!enrollmentDate) return false;
+  const startsAt = enrollmentDate instanceof Date ? new Date(enrollmentDate.getTime()) : new Date(enrollmentDate);
+  if (isNaN(startsAt.getTime())) return false;
+  startsAt.setDate(startsAt.getDate() + days);
+  return now >= startsAt;
+}
+
+function getAvailableMaterialsForPatient_(area, email, enrollmentDate, bypassRelease) {
+  return sheetToObjects(ensureMaterialHeaders_()).filter(function(material) {
+    const hasLink = isValidPublicLink_(material.Link) || !!material.DriveFileId;
+    return hasLink && materialAreaMatches_(material, area) &&
+      materialDestinationMatches_(material, area, email) && (bypassRelease || materialReleased_(material, enrollmentDate));
+  }).map(function(material) {
+    return {
+      id: String(material.Id || ''), tipo: material.Tipo || 'Material',
+      titulo: material.Titulo || 'Material da Regiane', descricao: material.Descricao || '',
+      link: material.DriveFileId ? '' : material.Link, file: !!material.DriveFileId,
+      area: material.Area || 'materiais'
+    };
+  });
+}
+
+function actionPatientMaterialFile(body) {
+  const area = String(body.area || '').trim().toLowerCase();
+  let email = '';
+  let enrollmentDate = '';
+  if (area === 'consultoria') {
+    const identity = consultoriaEmailFromToken_(body);
+    email = identity.email;
+    const patient = findConsultoriaRow(email);
+    if (!patient || (!isAdmin(identity.auth.email) && String(patient.Liberado).trim().toLowerCase() !== 'sim')) {
+      return { ok: false, error: 'Acesso à Consultoria não liberado.' };
+    }
+    enrollmentDate = patient.DataLiberacao;
+  } else if (area === 'programa') {
+    email = patientEmailFromToken_(body);
+    const patient = findPatientRow(email);
+    if (!patient) return { ok: false, error: 'Paciente não encontrada.' };
+    enrollmentDate = patient.DataInicio;
+  } else {
+    return { ok: false, error: 'Área de material inválida.' };
+  }
+  const materialId = String(body.materialId || '').trim();
+  if (!materialId) return { ok: false, error: 'Material inválido.' };
+  const material = sheetToObjects(ensureMaterialHeaders_()).filter(function(item) {
+    return String(item.Id || '') === materialId;
+  })[0];
+  if (!material || !material.DriveFileId || !materialAreaMatches_(material, area) ||
+      !materialDestinationMatches_(material, area, email) || !materialReleased_(material, enrollmentDate)) {
+    return { ok: false, error: 'Este material ainda não está disponível para você.' };
+  }
+  const blob = DriveApp.getFileById(String(material.DriveFileId)).getBlob();
+  return {
+    ok: true, fileName: blob.getName() || material.Titulo || 'material.pdf',
+    mimeType: blob.getContentType() || 'application/pdf',
+    fileBase64: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
 /**
- * A administradora adiciona um material (vídeo, PDF, link etc.) direto pelo
- * site — vira uma linha na aba Materiais. Se "email" vier vazio ou como
- * "TODOS", o material aparece pra todas as pacientes do Programa; senão,
- * só pra quem tem aquele e-mail cadastrado.
+ * A administradora adiciona vídeo, link ou PDF à aba Materiais. O arquivo
+ * enviado fica privado no Drive e só é entregue pela rota autenticada quando
+ * o paciente já tem acesso e a regra de liberação foi cumprida.
  */
 function actionAdminAddMaterial(body) {
   assertAdmin(body.idToken);
-  const link = String(body.link || '').trim();
   const titulo = String(body.titulo || '').trim();
-  if (!link || !titulo) return { ok: false, error: 'Preencha pelo menos o título e o link.' };
-  if (!isValidPublicLink_(link)) return { ok: false, error: 'Informe um link completo e válido, começando com https://.' };
+  let link = String(body.link || '').trim();
+  const fileBase64 = String(body.fileBase64 || '').trim();
+  const fileName = String(body.fileName || '').trim();
+  const fileMimeType = String(body.fileMimeType || '').trim().toLowerCase();
+  if (!titulo) return { ok: false, error: 'Informe um título.' };
+  if (fileBase64) {
+    if (fileMimeType !== 'application/pdf' || !/\.pdf$/i.test(fileName)) return { ok: false, error: 'Envie um arquivo PDF.' };
+    if (fileBase64.length > 7 * 1024 * 1024) return { ok: false, error: 'O PDF precisa ter até 5 MB.' };
+  } else if (!link || !isValidPublicLink_(link)) {
+    return { ok: false, error: 'Informe um link completo e válido, começando com https://.' };
+  }
 
   const areasValidas = ['aulas', 'rotulo', 'materiais', 'consultoria'];
   const area = areasValidas.indexOf(body.area) !== -1 ? body.area : 'materiais';
-  const tipoPadrao = area === 'materiais' ? 'Material' : 'Vídeo';
+  const tipoPadrao = fileBase64 ? 'PDF' : (area === 'materiais' ? 'Material' : 'Vídeo');
+  let destino = normEmail(body.email) || (area === 'consultoria' ? 'consultoria' : 'todos');
+  if (area === 'consultoria' && destino === 'todos') destino = 'consultoria';
+  if (area === 'consultoria' && destino !== 'consultoria' && destino.indexOf('@') === -1) return { ok: false, error: 'Escolha todas as pacientes da Consultoria ou uma paciente específica.' };
+  if (area !== 'consultoria' && destino !== 'todos' && destino.indexOf('@') === -1) return { ok: false, error: 'Escolha todas as pacientes ou uma paciente específica.' };
 
-  const destino = normEmail(body.email) || 'todos';
-  const sheet = getSheet('Materiais');
-  const id = new Date().getTime();
-  sheet.appendRow([id, destino === 'todos' ? 'TODOS' : destino, body.tipo || tipoPadrao, titulo, body.descricao || '', link, area]);
+  const releaseDays = Math.floor(Number(body.releaseDays) || 0);
+  if (releaseDays < 0 || releaseDays > 3650) return { ok: false, error: 'Informe um prazo entre 0 e 3650 dias.' };
+  const releaseDate = String(body.releaseDate || '').trim();
+  if (releaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return { ok: false, error: 'Informe uma data válida para liberação.' };
+  if (releaseDate && isNaN(new Date(releaseDate + 'T00:00:00').getTime())) return { ok: false, error: 'Informe uma data válida para liberação.' };
+
+  let fileId = '';
+  if (fileBase64) {
+    const bytes = Utilities.base64Decode(fileBase64);
+    if (bytes.length < 5 || String.fromCharCode.apply(null, bytes.slice(0, 5)) !== '%PDF-') return { ok: false, error: 'O arquivo selecionado não parece ser um PDF válido.' };
+    const blob = Utilities.newBlob(bytes, 'application/pdf', fileName.replace(/[\\/:*?"<>|]/g, '_'));
+    const file = DriveApp.createFile(blob);
+    fileId = file.getId();
+    link = file.getUrl();
+  }
+
+  const sheet = ensureMaterialHeaders_();
+  const headers = sheet.getDataRange().getValues()[0].map(String);
+  const values = {
+    Id: Utilities.getUuid(), Email: destino === 'todos' || destino === 'consultoria' ? destino.toUpperCase() : destino,
+    Tipo: body.tipo || tipoPadrao, Titulo: titulo, Descricao: body.descricao || '', Link: link,
+    Area: area, DriveFileId: fileId, DiasLiberacao: releaseDate ? 0 : releaseDays,
+    DataDisponibilizacao: releaseDate
+  };
+  sheet.appendRow(headers.map(function(header) { return values[header] !== undefined ? values[header] : ''; }));
 
   return { ok: true };
 }
@@ -1743,15 +1874,9 @@ function actionGoogleLoginConsultoria(body) {
 function actionConsultoriaDashboard(body) {
   const identity = consultoriaEmailFromToken_(body);
   const paciente = findConsultoriaRow(identity.email);
-  const materiais = sheetToObjects(getSheet('Materiais')).filter(function(m) {
-    const area = String(m.Area || '').trim().toLowerCase();
-    const destino = normEmail(m.Email);
-    return area === 'consultoria' &&
-      (destino === 'consultoria' || destino === 'todos' || destino === identity.email) &&
-      isValidPublicLink_(m.Link);
-  }).map(function(m) {
-    return { id: m.Id, titulo: m.Titulo || 'Vídeo da Regiane', descricao: m.Descricao || '', link: m.Link, tipo: m.Tipo || 'Vídeo' };
-  });
+  const materiais = paciente
+    ? getAvailableMaterialsForPatient_('consultoria', identity.email, paciente.DataLiberacao)
+    : isAdmin(identity.auth.email) ? getAvailableMaterialsForPatient_('consultoria', 'todos', '', true) : [];
   if (!paciente) {
     if (isAdmin(identity.auth.email)) return { ok: true, nome: 'Administradora', admin: true, respondeu: false, respostas: null, materiais: materiais };
     return { ok: false, error: 'Paciente da consultoria não encontrada.' };
@@ -2246,11 +2371,18 @@ function actionFinanceiroSavePatient(body) {
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('Id');
+  const emailCol = headers.indexOf('Email');
+  const serviceCol = headers.indexOf('Servico');
   const now = new Date();
+  let persistedId = id;
   const values = { Id:id, Email:email, Nome:name, Servico:service, ValorContratado:Number(item.value)||0, Origem:item.source||'Sistema financeiro', CadastroPendente:'Não', AtualizadoEm:now };
   let created = true;
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === id) {
+    const sameId = String(data[i][idCol]) === id;
+    const samePatientService = normEmail(data[i][emailCol]) === email && financeiroService_(data[i][serviceCol]) === service;
+    if (sameId || samePatientService) {
+      persistedId = String(data[i][idCol]) || id;
+      values.Id = persistedId;
       headers.forEach(function(h, c) { if (values[h] !== undefined) sheet.getRange(i + 1, c + 1).setValue(values[h]); });
       created = false;
       break;
@@ -2258,7 +2390,7 @@ function actionFinanceiroSavePatient(body) {
   }
   if (created) sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
   const memberAccess = syncMemberAccessFromFinance_(body, service, email, name);
-  return { ok:true, patientId:id, created:created, memberAccess:memberAccess };
+  return { ok:true, patientId:persistedId, created:created, memberAccess:memberAccess };
 }
 
 function actionFinanceiroSaveAppointment(body) {
