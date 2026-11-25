@@ -413,7 +413,7 @@
   const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
 
   (function(){
-    if(isAdminUser) document.getElementById('nav-admin').style.display = 'block';
+    if(isAdminUser && !isImpersonating) document.getElementById('nav-admin').style.display = 'block';
     if(isImpersonating){
       document.getElementById('impersonate-banner').style.display = 'flex';
       document.getElementById('impersonate-name').textContent = impersonateEmail;
@@ -452,7 +452,7 @@
   }
 
   function showTab(name){
-    if(name==='admin'&&!isAdminUser) name='inicio';
+    if(name==='admin'&&(!isAdminUser||isImpersonating)) name='inicio';
     document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
     const tab = document.getElementById('tab-'+name);

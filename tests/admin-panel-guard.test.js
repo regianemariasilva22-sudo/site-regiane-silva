@@ -14,13 +14,14 @@ function extractShowTab(source) {
   throw new Error('showTab(name) has unbalanced braces');
 }
 
-function exerciseDashboard(file, isAdminUser) {
+function exerciseDashboard(file, isAdminUser, isImpersonating = false) {
   const adminTab = { style: { display: 'none' } };
   const homeTab = { style: { display: 'none' } };
   let adminLoads = 0;
   const links = [{ classList: { remove() {}, add() {} } }];
   const context = {
     isAdminUser,
+    isImpersonating,
     event: {},
     window: { scrollTo() {}, __rebindCursor() {} },
     document: {
@@ -43,10 +44,15 @@ const dashboards = [
 ];
 
 for (const file of dashboards) {
+  const source = fs.readFileSync(file, 'utf8');
   const patientView = exerciseDashboard(file, false);
   assert.deepStrictEqual(patientView, { adminVisible: false, homeVisible: true, adminLoads: 0 }, `${file}: patient must not see or load admin panel`);
   const adminView = exerciseDashboard(file, true);
   assert.strictEqual(adminView.adminVisible, true, `${file}: administrator must retain panel access`);
+  const impersonatedPatientView = exerciseDashboard(file, true, true);
+  assert.deepStrictEqual(impersonatedPatientView, { adminVisible: false, homeVisible: true, adminLoads: 0 }, `${file}: administrator viewing as a patient must not see or load admin panel`);
+  assert.match(source, /if\(isAdminUser\s*&&\s*!isImpersonating\).*nav-admin/s, `${file}: admin navigation must stay hidden while impersonating`);
+  assert.match(source, /href="dashboard\.html\?tab=admin"/, `${file}: administrator must have a way to return to the admin panel`);
 }
 
 const program = fs.readFileSync('membros/programa/dashboard.html', 'utf8');
