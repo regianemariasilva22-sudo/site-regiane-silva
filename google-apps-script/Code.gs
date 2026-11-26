@@ -218,6 +218,7 @@ function doPost(e) {
     const action = body.action;
     if (action === 'patientDashboard') return jsonResponse(actionPatientDashboard(body));
     if (action === 'patientMaterialFile') return jsonResponse(actionPatientMaterialFile(body));
+    if (action === 'patientTrackMaterial') return jsonResponse(actionPatientTrackMaterial(body));
     if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
     if (action === 'savePatientAvatar') return jsonResponse(actionSavePatientAvatar(body));
@@ -474,6 +475,8 @@ function actionSaveRecipe(body) {
   const email = patientEmailFromToken_(body);
   const recipeId = String(body.recipeId || '').trim();
   if (!recipeId) return { ok: false, error: 'Receita inválida.' };
+  ensureHeaders_(getSheet('Pacientes'), ['ReceitasSalvas', 'ReceitasSalvasIds', 'PontosTotal']);
+  migrateLegacyRecipeSaves_();
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -496,6 +499,10 @@ function actionSaveRecipe(body) {
       sheet.getRange(i + 1, receitasCol + 1).setValue(novoTotal);
       sheet.getRange(i + 1, idsCol + 1).setValue(idsAtuais.join(','));
       addPointsUnlocked_(email, 'Receita salva: ' + (body.recipeTitle || recipeId), 2, 'receita:' + email + ':' + recipeId);
+      const patient = findPatientRow(email);
+      const recipe = recipeAnalytics_(recipeId, body.recipeTitle);
+      recordMaterialEngagement_(email, patient ? patient.Nome : email, recipeId, recipe.titulo, recipe.categoria, 'materiais', 'Receita salva', 'Botão Salvar receita', false);
+      refreshMaterialEngagementDashboard_();
       return { ok: true, jaSalva: false, receitasSalvas: novoTotal };
     }
   }
@@ -503,6 +510,151 @@ function actionSaveRecipe(body) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function ensureMaterialEngagementSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName('EngajamentoMateriais');
+  if (!sheet) sheet = ss.insertSheet('EngajamentoMateriais');
+  ensureHeaders_(sheet, ['Email', 'Nome', 'MaterialId', 'Titulo', 'Categoria', 'Area', 'Acao', 'PrimeiroRegistro', 'UltimoAcesso', 'TotalAcessos', 'Origem']);
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function recipeAnalytics_(recipeId, fallbackTitle) {
+  const recipes = {
+    'bowl-anti-inflamatorio': { titulo: 'Bowl anti-inflamatório', categoria: 'Salgado' },
+    'overnight-oats-canela': { titulo: 'Overnight oats de canela', categoria: 'Doce' },
+    'sopa-detox-gengibre': { titulo: 'Sopa detox de gengibre', categoria: 'Salgado' }
+  };
+  return recipes[recipeId] || { titulo: String(fallbackTitle || recipeId), categoria: 'Receita' };
+}
+
+function recordMaterialEngagement_(email, name, materialId, title, category, area, action, source, countRepeat) {
+  const sheet = ensureMaterialEngagementSheet_();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const materialCol = headers.indexOf('MaterialId');
+  const actionCol = headers.indexOf('Acao');
+  const accessCol = headers.indexOf('TotalAcessos');
+  const lastCol = headers.indexOf('UltimoAcesso');
+  const now = new Date();
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === normEmail(email) && String(data[i][materialCol]) === String(materialId)) {
+      if (!countRepeat) return { created: false, totalAcessos: Number(data[i][accessCol]) || 1 };
+      const total = (Number(data[i][accessCol]) || 1) + 1;
+      sheet.getRange(i + 1, accessCol + 1).setValue(total);
+      sheet.getRange(i + 1, lastCol + 1).setValue(now);
+      return { created: false, totalAcessos: total };
+    }
+  }
+  const values = { Email:normEmail(email), Nome:name || email, MaterialId:String(materialId), Titulo:title || String(materialId),
+    Categoria:category || 'Material', Area:area || 'materiais', Acao:action || 'Material acessado', PrimeiroRegistro:now,
+    UltimoAcesso:now, TotalAcessos:1, Origem:source || '' };
+  sheet.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+  return { created: true, totalAcessos: 1 };
+}
+
+function migrateLegacyRecipeSaves_() {
+  const patients = getSheet('Pacientes').getDataRange().getValues();
+  if (!patients.length) return;
+  const patientHeaders = patients[0];
+  const idsCol = patientHeaders.indexOf('ReceitasSalvasIds');
+  const emailCol = patientHeaders.indexOf('Email');
+  const nameCol = patientHeaders.indexOf('Nome');
+  if (idsCol < 0 || emailCol < 0) return;
+  const sheet = ensureMaterialEngagementSheet_();
+  const existing = sheetToObjects(sheet);
+  const keys = {};
+  existing.forEach(function(row) { keys[normEmail(row.Email) + '|' + String(row.MaterialId)] = true; });
+  const pending = [];
+  for (let i = 1; i < patients.length; i++) {
+    const email = normEmail(patients[i][emailCol]);
+    if (!email) continue;
+    String(patients[i][idsCol] || '').split(',').map(function(id) { return id.trim(); }).filter(Boolean).forEach(function(id) {
+      const key = email + '|' + id;
+      if (keys[key]) return;
+      const recipe = recipeAnalytics_(id, id);
+      pending.push([email, patients[i][nameCol] || email, id, recipe.titulo, recipe.categoria, 'materiais', 'Receita salva (histórico)', '', '', 1, 'Migração ReceitasSalvasIds']);
+      keys[key] = true;
+    });
+  }
+  if (pending.length) sheet.getRange(sheet.getLastRow() + 1, 1, pending.length, pending[0].length).setValues(pending);
+}
+
+function refreshMaterialEngagementDashboard_() {
+  const records = sheetToObjects(ensureMaterialEngagementSheet_());
+  const byMaterial = {};
+  const byPatient = {};
+  const patientRows = sheetToObjects(getSheet('Pacientes'));
+  const consultoriaRows = sheetToObjects(getSheet('ConsultoriaPacientes'));
+  records.forEach(function(row) {
+    const email = normEmail(row.Email);
+    const key = String(row.Area || 'materiais') + '|' + String(row.MaterialId || '');
+    if (!byMaterial[key]) byMaterial[key] = { title:row.Titulo || row.MaterialId, category:row.Categoria || 'Material', area:row.Area || 'materiais', patients:{}, accesses:0 };
+    byMaterial[key].patients[email] = true;
+    byMaterial[key].accesses += Number(row.TotalAcessos) || 1;
+    if (!byPatient[email]) byPatient[email] = { name:row.Nome || email, ids:{}, accesses:0, titles:{} };
+    byPatient[email].ids[key] = true;
+    byPatient[email].accesses += Number(row.TotalAcessos) || 1;
+    byPatient[email].titles[String(row.Titulo || row.MaterialId)] = true;
+  });
+  const materials = Object.keys(byMaterial).map(function(key) {
+    const item = byMaterial[key];
+    return [item.title, item.category, item.area, Object.keys(item.patients).length, item.accesses];
+  }).sort(function(a,b) { return b[3] - a[3] || b[4] - a[4] || String(a[0]).localeCompare(String(b[0])); });
+  const patients = Object.keys(byPatient).map(function(email) {
+    const item = byPatient[email];
+    const source = patientRows.filter(function(p) { return normEmail(p.Email) === email; })[0];
+    const consultoria = consultoriaRows.filter(function(p) { return normEmail(p.Email) === email; })[0];
+    const service = source ? patientProgramLabel_(resolvePatientProgram_(source)) : (consultoria ? 'Consultoria' : '');
+    return [item.name, email, service, Object.keys(item.ids).length, item.accesses, Object.keys(item.titles).sort().join(' · ')];
+  }).sort(function(a,b) { return b[3] - a[3] || String(a[0]).localeCompare(String(b[0])); });
+  const dashboard = getSheet('Dashboard');
+  dashboard.getRange(46, 1, 1, 5).setValues([['ENGAJAMENTO DE RECEITAS E MATERIAIS', '', '', '', '']]);
+  dashboard.getRange(47, 1, 1, 5).setValues([['Material', 'Categoria', 'Área', 'Pacientes únicos', 'Acessos / salvamentos']]);
+  if (materials.length) dashboard.getRange(48, 1, materials.length, 5).setValues(materials);
+  else dashboard.getRange(48, 1, 1, 5).setValues([['Nenhum salvamento ou acesso registrado', '', '', 0, 0]]);
+  dashboard.getRange(46, 7, 1, 6).setValues([['ENGAJAMENTO POR PACIENTE', '', '', '', '', '']]);
+  dashboard.getRange(47, 7, 1, 6).setValues([['Paciente', 'E-mail', 'Serviço', 'Materiais únicos', 'Acessos / salvamentos', 'Materiais']]);
+  if (patients.length) dashboard.getRange(48, 7, patients.length, 6).setValues(patients);
+  else dashboard.getRange(48, 7, 1, 6).setValues([['Nenhum salvamento ou acesso registrado', '', '', 0, 0, '']]);
+  dashboard.getRange(46, 1, 2, 5).setFontWeight('bold');
+  dashboard.getRange(46, 7, 2, 6).setFontWeight('bold');
+}
+
+function actionPatientTrackMaterial(body) {
+  const area = String(body.area || 'programa').trim().toLowerCase();
+  let email = '';
+  let viewerEmail = '';
+  let enrollmentDate = '';
+  if (area === 'consultoria') {
+    const identity = consultoriaEmailFromToken_(body);
+    email = identity.email;
+    viewerEmail = normEmail(identity.auth.email);
+    const patient = findConsultoriaRow(email);
+    if (!patient || (!isAdmin(viewerEmail) && String(patient.Liberado).trim().toLowerCase() !== 'sim')) return { ok:false, error:'Acesso à Consultoria não liberado.' };
+    enrollmentDate = patient.DataLiberacao;
+  } else if (area === 'programa') {
+    viewerEmail = verifyGoogleToken(body.idToken).email;
+    email = patientEmailFromToken_(body);
+    const patient = findPatientRow(email);
+    if (!patient) return { ok:false, error:'Paciente não encontrada.' };
+    enrollmentDate = patient.DataInicio;
+  } else return { ok:false, error:'Área de material inválida.' };
+  const materialId = String(body.materialId || '').trim();
+  const material = sheetToObjects(ensureMaterialHeaders_()).filter(function(item) { return String(item.Id || '') === materialId; })[0];
+  if (!material || !isValidPublicLink_(material.Link) || !materialAreaMatches_(material, area) ||
+      !materialDestinationMatches_(material, area, email) || !materialReleased_(material, enrollmentDate)) {
+    return { ok:false, error:'Este material ainda não está disponível para você.' };
+  }
+  if (!isAdmin(viewerEmail) || viewerEmail === email) {
+    recordMaterialEngagement_(email, (findPatientRow(email) || findConsultoriaRow(email) || {}).Nome || email,
+      materialId, material.Titulo || 'Material da Regiane', material.Categoria || material.Tipo || 'Material', area, 'Material acessado', 'Link de material', true);
+    refreshMaterialEngagementDashboard_();
+  }
+  return { ok:true };
 }
 
 /**
@@ -584,6 +736,16 @@ function actionAdminListPatients(body) {
   assertAdmin(body.idToken);
   ensurePatientInstagramHeader_();
   ensureGamificationSheets_();
+  migrateLegacyRecipeSaves_();
+  refreshMaterialEngagementDashboard_();
+  const engagementByEmail = {};
+  sheetToObjects(ensureMaterialEngagementSheet_()).forEach(function(row) {
+    const key = normEmail(row.Email);
+    if (!key) return;
+    if (!engagementByEmail[key]) engagementByEmail[key] = { ids:{}, accesses:0 };
+    engagementByEmail[key].ids[String(row.Area || 'materiais') + '|' + String(row.MaterialId || '')] = true;
+    engagementByEmail[key].accesses += Number(row.TotalAcessos) || 1;
+  });
   const financeiroSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('FinanceiroPacientes');
   const pacientesFinanceiro = financeiroSheet ? sheetToObjects(financeiroSheet) : [];
   pacientesFinanceiro.forEach(function(financePatient) {
@@ -599,6 +761,7 @@ function actionAdminListPatients(body) {
       const financeiroPatient = pacientesFinanceiro.filter(function(fp) { return normEmail(fp.Email) === normEmail(p.Email) && financeiroService_(fp.Servico) === financeiroService_(resolvePatientProgram_(p, pacientesFinanceiro)); })[0];
       const appointments = financeiroAppointmentsForPatient_(p.Email);
       const totalPago = appointments.reduce(function(sum,a) { return sum + Number(a.paid || 0); },0);
+      const engagement = engagementByEmail[normEmail(p.Email)] || { ids:{}, accesses:0 };
       return {
         email: p.Email,
         nome: p.Nome,
@@ -607,6 +770,8 @@ function actionAdminListPatients(body) {
         diasAcompanhamento: daysSince(p.DataInicio),
         retornosRealizados: Number(p.RetornosRealizados) || 0,
         receitasSalvas: Number(p.ReceitasSalvas) || 0,
+        materiaisUnicos: Object.keys(engagement.ids).length,
+        materiaisAcessos: engagement.accesses,
         pontosTotal: pontosTotal,
         creditoGerado: credito.gerado,
         creditoUsado: credito.usado,
@@ -929,7 +1094,7 @@ function ensureMaterialHeaders_() {
     headers = ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'];
     sheet.appendRow(headers);
   }
-  ['DriveFileId', 'DiasLiberacao', 'DataDisponibilizacao'].forEach(function(name) {
+  ['DriveFileId', 'DiasLiberacao', 'DataDisponibilizacao', 'Categoria'].forEach(function(name) {
     if (headers.indexOf(name) === -1) {
       sheet.getRange(1, headers.length + 1).setValue(name);
       headers.push(name);
@@ -979,7 +1144,7 @@ function getAvailableMaterialsForPatient_(area, email, enrollmentDate, bypassRel
       materialDestinationMatches_(material, area, email) && (bypassRelease || materialReleased_(material, enrollmentDate));
   }).map(function(material) {
     return {
-      id: String(material.Id || ''), tipo: material.Tipo || 'Material',
+      id: String(material.Id || ''), tipo: material.Tipo || 'Material', categoria: material.Categoria || material.Tipo || 'Material',
       titulo: material.Titulo || 'Material da Regiane', descricao: material.Descricao || '',
       link: material.DriveFileId ? '' : material.Link, file: !!material.DriveFileId,
       area: material.Area || 'materiais'
@@ -990,16 +1155,19 @@ function getAvailableMaterialsForPatient_(area, email, enrollmentDate, bypassRel
 function actionPatientMaterialFile(body) {
   const area = String(body.area || '').trim().toLowerCase();
   let email = '';
+  let viewerEmail = '';
   let enrollmentDate = '';
   if (area === 'consultoria') {
     const identity = consultoriaEmailFromToken_(body);
     email = identity.email;
+    viewerEmail = normEmail(identity.auth.email);
     const patient = findConsultoriaRow(email);
     if (!patient || (!isAdmin(identity.auth.email) && String(patient.Liberado).trim().toLowerCase() !== 'sim')) {
       return { ok: false, error: 'Acesso à Consultoria não liberado.' };
     }
     enrollmentDate = patient.DataLiberacao;
   } else if (area === 'programa') {
+    viewerEmail = verifyGoogleToken(body.idToken).email;
     email = patientEmailFromToken_(body);
     const patient = findPatientRow(email);
     if (!patient) return { ok: false, error: 'Paciente não encontrada.' };
@@ -1017,6 +1185,12 @@ function actionPatientMaterialFile(body) {
     return { ok: false, error: 'Este material ainda não está disponível para você.' };
   }
   const blob = DriveApp.getFileById(String(material.DriveFileId)).getBlob();
+  if (!isAdmin(viewerEmail) || viewerEmail === email) {
+    const patient = findPatientRow(email) || findConsultoriaRow(email) || {};
+    recordMaterialEngagement_(email, patient.Nome || email, materialId, material.Titulo || 'Material da Regiane', material.Categoria || material.Tipo || 'PDF', area,
+      'Material acessado', 'Download de PDF', true);
+    refreshMaterialEngagementDashboard_();
+  }
   return {
     ok: true, fileName: blob.getName() || material.Titulo || 'material.pdf',
     mimeType: blob.getContentType() || 'application/pdf',
@@ -1072,7 +1246,7 @@ function actionAdminAddMaterial(body) {
   const headers = sheet.getDataRange().getValues()[0].map(String);
   const values = {
     Id: Utilities.getUuid(), Email: destino === 'todos' || destino === 'consultoria' ? destino.toUpperCase() : destino,
-    Tipo: body.tipo || tipoPadrao, Titulo: titulo, Descricao: body.descricao || '', Link: link,
+    Tipo: body.tipo || tipoPadrao, Categoria: String(body.categoria || body.tipo || tipoPadrao).trim(), Titulo: titulo, Descricao: body.descricao || '', Link: link,
     Area: area, DriveFileId: fileId, DiasLiberacao: releaseDate ? 0 : releaseDays,
     DataDisponibilizacao: releaseDate
   };

@@ -780,7 +780,10 @@
             card.addEventListener('click', ()=>downloadMemberMaterial(m.id));
           } else if(m.link){
             card.style.cursor = 'none';
-            card.addEventListener('click', ()=>window.open(m.link, '_blank', 'noopener'));
+            card.addEventListener('click', ()=>{
+              window.open(m.link, '_blank', 'noopener');
+              apiPost('patientTrackMaterial', { idToken: patientIdToken, email: patientEmail, area: 'programa', materialId: m.id });
+            });
           }
           wrap.appendChild(card);
         });
@@ -1261,7 +1264,7 @@
           <div>
             <h3 style="margin:0;">${p.nome || p.email}</h3>
             <p class="card-text" style="margin:2px 0 0;"><strong>Consulta/programa:</strong> ${p.servico || 'Programa Reequilíbrio Funcional'}</p>
-            <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas · ${p.fotosTotal || 0} fotos</p>
+            <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas · ${p.materiaisUnicos || 0} materiais usados (${p.materiaisAcessos || 0} acessos/salvamentos) · ${p.fotosTotal || 0} fotos</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Instagram:</strong> ${p.instagram || 'não cadastrado'}</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Crédito:</strong> R$ ${Number(p.creditoDisponivel || 0).toFixed(2).replace('.', ',')} disponível · R$ ${Number(p.creditoUsado || 0).toFixed(2).replace('.', ',')} utilizado · R$ ${Number(p.creditoGerado || 0).toFixed(2).replace('.', ',')} gerado</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Financeiro:</strong> R$ ${Number(p.valorContratado||0).toFixed(2).replace('.', ',')} contratado · R$ ${Number(p.valorRecebido||0).toFixed(2).replace('.', ',')} recebido</p>
