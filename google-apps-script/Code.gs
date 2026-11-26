@@ -79,7 +79,7 @@ function normalizeInstagramPostKey_(value) {
 
 function ensurePatientInstagramHeader_() {
   const sheet = getSheet('Pacientes');
-  ensureHeaders_(sheet, ['Instagram']);
+  ensureHeaders_(sheet, ['Instagram', 'Servico']);
   return sheet;
 }
 
@@ -296,6 +296,40 @@ function findPatientRow(email) {
   return null;
 }
 
+function normalizePatientProgram_(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw.indexOf('dupla') !== -1) return 'Consulta Dupla';
+  if (raw.indexOf('acompanh') !== -1) return 'Acompanhamento de 5 meses';
+  if (raw.indexOf('reequil') !== -1 || raw.indexOf('programa') !== -1) return 'Programa Reequilíbrio';
+  return '';
+}
+
+function patientProgramLabel_(value) {
+  const service = normalizePatientProgram_(value) || 'Programa Reequilíbrio';
+  return service === 'Programa Reequilíbrio' ? 'Programa Reequilíbrio Funcional' : service;
+}
+
+function resolvePatientProgram_(patient, financialPatients) {
+  const saved = normalizePatientProgram_(patient.Servico);
+  if (saved) return saved;
+  if (!financialPatients) {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('FinanceiroPacientes');
+    financialPatients = sheet ? sheetToObjects(sheet) : [];
+  }
+  const email = normEmail(patient.Email);
+  const records = financialPatients.filter(function(row) {
+    return normEmail(row.Email) === email && normalizePatientProgram_(row.Servico);
+  });
+  const explicitlyRegistered = records.filter(function(row) {
+    return String(row.CadastroPendente || '').trim().toLowerCase() !== 'sim';
+  });
+  const candidates = explicitlyRegistered.length ? explicitlyRegistered : records;
+  candidates.sort(function(a, b) {
+    return new Date(b.AtualizadoEm || b.CriadoEm || 0) - new Date(a.AtualizadoEm || a.CriadoEm || 0);
+  });
+  return candidates.length ? normalizePatientProgram_(candidates[0].Servico) : 'Programa Reequilíbrio';
+}
+
 function actionLogin(email) {
   const p = findPatientRow(email);
   if (!p) {
@@ -337,6 +371,7 @@ function actionDashboard(email) {
     p = { Nome: 'Administradora', PontosTotal: 0, RetornosRealizados: 0, ReceitasSalvas: 0, ProgressoPercent: 0, DataInicio: '', ProximoRetornoData: '', ProximoRetornoHora: '', PlanoTexto: 'Acesso de administradora — sem plano individual.' };
   }
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
+  const servico = resolvePatientProgram_(p);
 
   const materiais = getAvailableMaterialsForPatient_('programa', email, p.DataInicio);
 
@@ -360,6 +395,7 @@ function actionDashboard(email) {
   return {
     ok: true,
     nome: p.Nome,
+    servico: patientProgramLabel_(servico),
     diasAcompanhamento: daysSince(p.DataInicio),
     retornosRealizados: Number(p.RetornosRealizados) || 0,
     receitasSalvas: Number(p.ReceitasSalvas) || 0,
@@ -528,6 +564,8 @@ function actionAdminListPatients(body) {
   ensurePatientInstagramHeader_();
   ensureGamificationSheets_();
   const pacientes = sheetToObjects(getSheet('Pacientes'));
+  const financeiroSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('FinanceiroPacientes');
+  const pacientesFinanceiro = financeiroSheet ? sheetToObjects(financeiroSheet) : [];
   return {
     ok: true,
     pacientes: pacientes.map(function(p) {
@@ -537,6 +575,7 @@ function actionAdminListPatients(body) {
       return {
         email: p.Email,
         nome: p.Nome,
+        servico: patientProgramLabel_(resolvePatientProgram_(p, pacientesFinanceiro)),
         instagram: p.Instagram || '',
         diasAcompanhamento: daysSince(p.DataInicio),
         retornosRealizados: Number(p.RetornosRealizados) || 0,
@@ -649,9 +688,12 @@ function actionAdminAddPatient(body) {
   const email = normEmail(body.email);
   const nome = String(body.nome || '').trim();
   const instagram = normalizeInstagramProfile_(body.instagram);
+  const requestedService = String(body.servico || body.service || '').trim();
+  const servico = requestedService ? normalizePatientProgram_(requestedService) : '';
   if (!email || email.indexOf('@') === -1 || !nome) {
     return { ok: false, error: 'Informe o nome e um e-mail válido.' };
   }
+  if (requestedService && !servico) return { ok: false, error: 'Escolha Consulta Dupla ou Programa Reequilíbrio.' };
 
   const sheet = ensurePatientInstagramHeader_();
   const data = sheet.getDataRange().getValues();
@@ -663,6 +705,7 @@ function actionAdminAddPatient(body) {
     if (normEmail(data[i][emailCol]) === email) {
       sheet.getRange(i + 1, nomeCol + 1).setValue(nome);
       if (instagram) sheet.getRange(i + 1, instagramCol + 1).setValue(instagram);
+      if (servico) sheet.getRange(i + 1, headers.indexOf('Servico') + 1).setValue(servico);
       return { ok: true, created: false };
     }
   }
@@ -676,6 +719,7 @@ function actionAdminAddPatient(body) {
   row[headers.indexOf('ProgressoPercent')] = 0;
   row[headers.indexOf('PontosTotal')] = 0;
   row[instagramCol] = instagram;
+  row[headers.indexOf('Servico')] = servico || 'Programa Reequilíbrio';
   sheet.appendRow(row);
   return { ok: true, created: true };
 }
@@ -2345,7 +2389,7 @@ function actionFinanceiroLoad(body) {
  * o acesso. Nunca remove automaticamente um acesso anterior nem apaga histórico.
  */
 function syncMemberAccessFromFinance_(body, service, email, name) {
-  const accessBody = { idToken: body.idToken, email: email, nome: name };
+  const accessBody = { idToken: body.idToken, email: email, nome: name, servico: service };
   if (service === 'Consultoria') {
     const result = actionAdminAddConsultoriaPatient(accessBody);
     if (!result.ok) throw new Error(result.error || 'Não foi possível liberar a Consultoria.');
