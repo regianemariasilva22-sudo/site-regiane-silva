@@ -308,8 +308,8 @@
       <p class="mem-sub">Converse, compartilhe conquistas e participe dos retornos em grupo comigo.</p>
       <div class="mem-community">
         <div class="comm-card">
-          <div class="comm-avatars"><span></span><span></span><span></span></div>
-          <div class="h3" style="font-size:16px;">Di?rio de conquistas</div>
+          <div class="comm-avatars" id="community-participant-avatars" aria-label="Participantes recentes"></div>
+          <div class="h3" style="font-size:16px;">Di&#225;rio de conquistas</div>
           <p class="card-text" style="margin-top:8px;">Compartilhe seus resultados e celebre com o grupo.</p>
         </div>
       </div>
@@ -325,7 +325,7 @@
           <div class="feed-head"><div class="mem-avatar feed-author-avatar" style="width:34px;height:34px;"></div><div><div class="feed-name">Marta</div><div class="feed-time">há 2 horas</div></div></div>
           <p class="feed-text">Semana 6 e finalmente meu intestino funcionando todo dia! 🌿</p>
           <div class="feed-photo" aria-label="Imagem compartilhada"></div>
-          <div class="feed-comments" id="feed-comments-1"><div class="feed-comment"><div class="fc-avatar"></div><div><span class="fc-name">Regiane</span><span class="fc-text">Que orgulho, Marta! Continue assim 💗</span></div></div></div>
+          <div class="feed-comments" id="feed-comments-1"><div class="feed-comment"><div class="fc-avatar" aria-label="Regiane" style="background-image:url('../../assets/img/regiane-retrato.jpg');background-size:cover;background-position:center;"></div><div><span class="fc-name">Regiane</span><span class="fc-text">Que orgulho, Marta! Continue assim 💗</span></div></div></div>
           <div class="feed-input-row"><input type="text" maxlength="1000" placeholder="Escreva uma conquista ou comentário..." id="feed-input-1" /><label class="feed-image-button" for="feed-image-1">📷 Foto</label><input type="file" accept="image/jpeg,image/png,image/webp" id="feed-image-1" style="display:none;" /><button type="button" onclick="postComment(1)">Publicar</button></div>
         </div>
         <div class="feed-post" data-post-id="2">
@@ -344,31 +344,9 @@
     <div id="tab-materiais" style="display:none;">
       <h1 class="mem-hello" style="font-size:28px;">Receitas &amp; Materiais</h1>
       <p class="mem-sub">Receituário funcional, planners e guias que preparei para você.</p>
-      <h3 style="margin-top:40px;margin-bottom:16px;">Receituário funcional</h3>
-      <p class="card-text" style="margin-bottom:16px;">Salve as receitas que você quer guardar — elas contam pontos e aparecem no seu resumo.</p>
-      <div class="identify-grid" id="receitas-grid">
-        <div class="glass-card" data-recipe-id="bowl-anti-inflamatorio">
-          <span class="card-num">Receita</span>
-          <div class="card-title">Bowl anti-inflamatório</div>
-          <p class="card-text">Quinoa, cúrcuma, vegetais assados e molho de tahine.</p>
-          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
-        </div>
-        <div class="glass-card" data-recipe-id="overnight-oats-canela">
-          <span class="card-num">Receita</span>
-          <div class="card-title">Overnight oats de canela</div>
-          <p class="card-text">Aveia, chia, canela e leite vegetal — pronto na geladeira de um dia pro outro.</p>
-          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
-        </div>
-        <div class="glass-card" data-recipe-id="sopa-detox-gengibre">
-          <span class="card-num">Receita</span>
-          <div class="card-title">Sopa detox de gengibre</div>
-          <p class="card-text">Abóbora, gengibre e cúrcuma — ótima pra dias de intestino preso.</p>
-          <button type="button" class="btn btn-outline btn-sm recipe-save-btn" style="width:100%;justify-content:center;margin-top:14px;">Salvar receita</button>
-        </div>
-      </div>
-
-      <h3 id="materiais-pessoais-title" style="margin-top:40px;margin-bottom:16px;display:none;">Materiais indicados pra você</h3>
+      <h3 id="materiais-pessoais-title" style="margin-top:40px;margin-bottom:16px;">Materiais indicados pra você</h3>
       <div class="identify-grid" id="materiais-pessoais"></div>
+      <p id="materiais-pessoais-empty" class="card-text" style="display:none;color:var(--muted);">Nenhum material disponivel no momento.</p>
     </div>
 
     <!-- PLANO TAB -->
@@ -383,8 +361,8 @@
       </div>
 
       <div class="mem-panel" style="margin-top:20px;">
-        <h3>Receitas que salvei</h3>
-        <p class="card-text" style="margin:6px 0 12px;">Aqui ficam as receitas que voce guardou na plataforma.</p>
+        <h3>Receitas e materiais que salvei</h3>
+        <p class="card-text" style="margin:6px 0 12px;">Aqui ficam os conteudos que voce guardou na plataforma.</p>
         <div id="saved-recipes-list"><p class="card-text" style="color:var(--muted);">Voce ainda nao salvou receitas.</p></div>
       </div>
     </div>
@@ -528,6 +506,19 @@
 </div>
 <div class="video-toast" id="video-toast">Este vídeo é exclusivo desta plataforma — assista por aqui 💛</div>
 
+<div id="material-action-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(30,20,22,.55);align-items:center;justify-content:center;padding:20px;">
+  <div role="dialog" aria-modal="true" aria-labelledby="material-action-title" class="mem-panel" style="width:min(100%,520px);">
+    <button type="button" id="material-action-close" aria-label="Fechar" class="btn btn-outline btn-sm" style="float:right;">Fechar</button>
+    <h3 id="material-action-title" style="padding-right:80px;"></h3>
+    <p class="card-text" id="material-action-description" style="margin-top:8px;"></p>
+    <p class="card-text" id="material-action-feedback" role="status" style="display:none;margin-top:12px;color:var(--marsala);font-weight:700;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px;">
+      <button type="button" class="btn btn-outline btn-sm" id="material-action-save"></button>
+      <button type="button" class="btn btn-primary btn-sm" id="material-action-view"></button>
+    </div>
+  </div>
+</div>
+
 <script src="../../assets/js/api.js"></script>
 <script src="../../assets/js/main.js"></script>
 <script>
@@ -540,6 +531,9 @@
   let homeLatestLesson = null;
   let homeNextLive = null;
   let currentSavedRecipes = [];
+  let currentSavedMaterials = [];
+  let currentAvailableMaterials = [];
+  let activeMaterialAction = null;
   const impersonateEmail = urlParams.get('as');
   const isImpersonating = !!(impersonateEmail && isAdminUser);
   const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
@@ -665,23 +659,40 @@
   });
 
   /* ── DASHBOARD: dados reais da paciente ── */
-  function renderSavedRecipes(recipes){
-    const wrap=document.getElementById('saved-recipes-list');wrap.innerHTML='';
-    if(!recipes||!recipes.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Voce ainda nao salvou receitas.</p>';return;}
-    recipes.forEach(recipe=>{const item=document.createElement('div');item.className='mem-list-item';item.style.borderBottom='1px solid var(--hairline-soft)';
-      const icon=document.createElement('div');icon.className='mli-icon';icon.textContent='♡';const body=document.createElement('div');
-      const title=document.createElement('div');title.className='mli-title';title.textContent=recipe.titulo||recipe.id;
-      const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=(recipe.categoria||'Receita')+(recipe.descricao?' · '+recipe.descricao:'');body.append(title,detail);item.append(icon,body);wrap.appendChild(item);});
+  function initials(name){return String(name||'').trim().split(/[\s-]+/).filter(Boolean).slice(0,2).map(part=>part.charAt(0).toUpperCase()).join('')||'?';}
+  function renderCommunityParticipants(people){
+    const wrap=document.getElementById('community-participant-avatars');if(!wrap)return;wrap.innerHTML='';
+    (people||[]).forEach(person=>{const avatar=document.createElement('span');avatar.title=person.nome||'Participante';avatar.setAttribute('aria-label',person.nome||'Participante');avatar.style.cssText='display:inline-flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:10px;font-weight:700;';setAvatar(avatar,person.avatarDataUrl);if(!person.avatarDataUrl)avatar.textContent=initials(person.nome);wrap.appendChild(avatar);});
+    document.querySelectorAll('.feed-post[data-post-id]').forEach(post=>{const name=post.querySelector('.feed-name')?.textContent||'';const avatar=post.querySelector('.feed-author-avatar');if(!avatar)return;const participant=(people||[]).find(person=>String(person.nome||'').trim().toLowerCase()===name.trim().toLowerCase());setAvatar(avatar,participant&&participant.avatarDataUrl);avatar.textContent=participant&&participant.avatarDataUrl?'':initials(name);});
+  }
+  function isRecipeMaterialForUi(material){return /(receita|bolinho|geleia|biscoito|batata|sopa|bowl|overnight|frango|lanchinho|lanche)/i.test([material.titulo,material.categoria,material.tipo].join(' '));}
+  function renderSavedRecipes(recipes,materials){
+    const wrap=document.getElementById('saved-recipes-list');wrap.innerHTML='';const saved=[...(recipes||[]).map(item=>({...item,legacy:true})),...(materials||[]).map(item=>({...item,legacy:false}))];
+    if(!saved.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Voce ainda nao salvou receitas ou materiais.</p>';return;}
+    saved.forEach(entry=>{const item=document.createElement('div');item.className='mem-list-item';item.style.borderBottom='1px solid var(--hairline-soft)';const icon=document.createElement('div');icon.className='mli-icon';icon.textContent='♡';const body=document.createElement('div');body.style.flex='1';const title=document.createElement('div');title.className='mli-title';title.textContent=entry.titulo||entry.id;const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=(entry.categoria||'Material')+(entry.descricao?' ? '+entry.descricao:'');body.append(title,detail);item.append(icon,body);const material=currentAvailableMaterials.find(candidate=>candidate.id===entry.id);if(material){const view=document.createElement('button');view.type='button';view.className='btn btn-outline btn-sm';view.textContent='Ver';view.addEventListener('click',()=>openMaterialActions(material));item.appendChild(view);}else if(entry.legacy){const old=document.createElement('div');old.className='mli-sub';old.textContent='Conteudo antigo salvo; arquivo nao vinculado.';body.appendChild(old);}wrap.appendChild(item);});
   }
   function renderHomeActivities(activities){
     const wrap=document.getElementById('home-community-activity');wrap.innerHTML='';
     if(!activities||!activities.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Nenhuma atividade recente.</p>';return;}
-    activities.forEach(activity=>{const row=document.createElement('div');row.className='mem-list-item';row.style.cssText='border:none;padding:10px 0;';
-      const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;flex-shrink:0;';setAvatar(avatar,activity.avatarDataUrl);
-      const body=document.createElement('div');const title=document.createElement('div');title.className='mli-title';title.textContent=activity.titulo||'Atividade recente';
-      const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=activity.detalhe||'';body.append(title,detail);row.append(avatar,body);
-      row.style.cursor='pointer';row.addEventListener('click',()=>{if(activity.tipo==='comunidade')showTab('comunidade');else if(activity.tipo==='live'){if(activity.link)window.open(activity.link,'_blank','noopener');else showTab('comunidade');}else{showTab('materiais');if(activity.link)window.open(activity.link,'_blank','noopener');}});wrap.appendChild(row);});
+    activities.forEach(activity=>{const row=document.createElement('div');row.className='mem-list-item';row.style.cssText='border:none;padding:10px 0;';const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;flex-shrink:0;';setAvatar(avatar,activity.avatarDataUrl);const body=document.createElement('div');const title=document.createElement('div');title.className='mli-title';title.textContent=activity.titulo||'Atividade recente';const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=activity.detalhe||'';body.append(title,detail);row.append(avatar,body);row.style.cursor='pointer';row.addEventListener('click',()=>{if(activity.tipo==='comunidade')showTab('comunidade');else if(activity.tipo==='live'){if(activity.link)window.open(activity.link,'_blank','noopener');else showTab('comunidade');}else{showTab('materiais');const material=currentAvailableMaterials.find(item=>item.id===activity.materialId);if(material)openMaterialActions(material);}});wrap.appendChild(row);});
   }
+  function openMaterialActions(material){
+    activeMaterialAction=material;const recipe=isRecipeMaterialForUi(material);document.getElementById('material-action-title').textContent=material.titulo||'Material da Regiane';document.getElementById('material-action-description').textContent=material.descricao||material.categoria||material.tipo||'Escolha se deseja abrir ou guardar este conteudo.';document.getElementById('material-action-save').textContent=recipe?'Salvar receita':'Salvar material';document.getElementById('material-action-view').textContent=recipe?'Ver receita':'Ver material';const alreadySaved=currentSavedMaterials.some(item=>item.id===material.id);document.getElementById('material-action-feedback').textContent=alreadySaved?'Este conteudo ja esta salvo no seu Meu Plano.':'';document.getElementById('material-action-feedback').style.display=alreadySaved?'block':'none';document.getElementById('material-action-modal').style.display='flex';
+  }
+  const materialActionModal=document.getElementById('material-action-modal');
+  document.getElementById('material-action-close').addEventListener('click',()=>materialActionModal.style.display='none');
+  materialActionModal.addEventListener('click',event=>{if(event.target===materialActionModal)materialActionModal.style.display='none';});
+  async function openMaterialInTab(material,target){
+    if(material.file){const result=await apiPost('patientMaterialFile',{idToken:patientIdToken,email:patientEmail,area:'programa',materialId:material.id});if(!result.ok)throw new Error(result.error||'Nao foi possivel abrir este material.');const bytes=Uint8Array.from(atob(result.fileBase64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:result.mimeType||'application/pdf'}));target.location.href=url;setTimeout(()=>URL.revokeObjectURL(url),300000);return;}
+    const result=await apiPost('patientTrackMaterial',{idToken:patientIdToken,email:patientEmail,area:'programa',materialId:material.id});if(!result.ok)throw new Error(result.error||'Nao foi possivel registrar o acesso a este material.');if(!material.link)throw new Error('Este material nao tem um link disponivel.');target.location.href=material.link;
+  }
+  document.getElementById('material-action-view').addEventListener('click',async event=>{
+    if(!activeMaterialAction)return;const button=event.currentTarget,target=window.open('about:blank','_blank');if(!target){document.getElementById('material-action-feedback').textContent='Permita abrir uma nova aba para ver o material.';document.getElementById('material-action-feedback').style.display='block';return;}target.opener=null;button.disabled=true;try{await openMaterialInTab(activeMaterialAction,target);materialActionModal.style.display='none';}catch(error){target.close();const feedback=document.getElementById('material-action-feedback');feedback.textContent=error.message||'Nao foi possivel abrir o material.';feedback.style.display='block';}finally{button.disabled=false;}
+  });
+  document.getElementById('material-action-save').addEventListener('click',async event=>{
+    if(!activeMaterialAction)return;if(isImpersonating){window.alert('No modo Ver como paciente, nao salvamos materiais em nome dela.');return;}const button=event.currentTarget,material=activeMaterialAction,target=window.open('about:blank','_blank');if(!target){document.getElementById('material-action-feedback').textContent='Permita abrir uma nova aba para continuar.';document.getElementById('material-action-feedback').style.display='block';return;}target.opener=null;button.disabled=true;const feedback=document.getElementById('material-action-feedback');feedback.textContent='Salvando no Meu Plano...';feedback.style.display='block';
+    try{const result=await apiPost('saveMaterial',{idToken:patientIdToken,email:patientEmail,materialId:material.id});if(!result.ok)throw new Error(result.error||'Nao foi possivel salvar o material.');if(!result.jaSalvo){currentSavedMaterials.push({id:material.id,titulo:material.titulo,categoria:material.categoria,descricao:material.descricao,file:material.file,link:material.link});document.getElementById('stat-receitas').textContent=String(Number(document.getElementById('stat-receitas').textContent||0)+(isRecipeMaterialForUi(material)?1:0));renderSavedRecipes(currentSavedRecipes,currentSavedMaterials);}feedback.textContent=result.jaSalvo?'Este conteudo ja estava salvo. Abrindo...':(isRecipeMaterialForUi(material)?'Receita salva no Meu Plano; +2 pontos. Abrindo...':'Material salvo no Meu Plano; +2 pontos. Abrindo...');loadDashboardData();await openMaterialInTab(material,target);materialActionModal.style.display='none';}catch(error){target.close();feedback.textContent=error.message||'Nao foi possivel salvar ou abrir o material.';feedback.style.display='block';}finally{button.disabled=false;}
+  });
   async function loadDashboardData(){
     if(!apiConfigured() || !patientEmail || !patientIdToken){ window.location.replace('login.html'); return; }
     const d = await apiPost('patientDashboard', { idToken: patientIdToken, email: patientEmail });
@@ -724,9 +735,11 @@
     homeNextLive=Array.isArray(d.proximasLives)&&d.proximasLives.length?d.proximasLives[0]:null;
     const liveStep=document.getElementById('home-next-live');liveStep.style.display=homeNextLive?'flex':'none';
     if(homeNextLive){document.getElementById('home-next-live-title').textContent=homeNextLive.titulo;document.getElementById('home-next-live-sub').textContent=homeNextLive.data+' | '+homeNextLive.hora;}
-    currentSavedRecipes=Array.isArray(d.receitasSalvasLista)?d.receitasSalvasLista:[];renderSavedRecipes(currentSavedRecipes);
-    const savedRecipeIds=new Set(currentSavedRecipes.map(recipe=>recipe.id));
-    document.querySelectorAll('.recipe-save-btn').forEach(button=>{const card=button.closest('[data-recipe-id]');const saved=card&&savedRecipeIds.has(card.dataset.recipeId);button.disabled=!!saved;button.textContent=saved?'Salva':'Salvar receita';});
+    currentAvailableMaterials=Array.isArray(d.materiais)?d.materiais.filter(item=>(item.area||'materiais')==='materiais'):[];
+    currentSavedRecipes=Array.isArray(d.receitasSalvasLista)?d.receitasSalvasLista:[];
+    currentSavedMaterials=Array.isArray(d.materiaisSalvosLista)?d.materiaisSalvosLista:[];
+    renderCommunityParticipants(d.participantesComunidade||[]);
+    renderSavedRecipes(currentSavedRecipes,currentSavedMaterials);
     renderHomeActivities(d.atividadeRecente||[]);
     const communityLives=document.getElementById('community-live-events');if(communityLives){communityLives.innerHTML='';(d.proximasLives||[]).forEach(live=>{const card=document.createElement('div');card.className='mem-panel';card.style.marginBottom='12px';const title=document.createElement('h3');title.textContent=live.titulo;const detail=document.createElement('p');detail.className='card-text';detail.textContent='Live agendada para '+live.data+' | '+live.hora+(live.descricao?' | '+live.descricao:'');card.append(title,detail);if(live.link){const link=document.createElement('a');link.className='btn btn-primary btn-sm';link.href=live.link;link.target='_blank';link.rel='noopener';link.textContent='Abrir live';card.append(link);}communityLives.appendChild(card);});}
     const calendarList=document.getElementById('calendar-upcoming-list');
@@ -792,29 +805,13 @@
     }));
     const rotuloVideos = materiaisDisponiveis.filter(m => m.area === 'rotulo');
 
-    if(materiaisGerais.length){
-        const wrap = document.getElementById('materiais-pessoais');
-        document.getElementById('materiais-pessoais-title').style.display = 'block';
-        materiaisGerais.forEach(m=>{
-          const card = document.createElement('div');
-          card.className = 'glass-card';
-          card.innerHTML = `<span class="card-num"></span><div class="card-title"></div><p class="card-text"></p>`;
-          card.querySelector('.card-num').textContent = m.tipo || 'Material';
-          card.querySelector('.card-title').textContent = m.titulo || '';
-          card.querySelector('.card-text').textContent = m.descricao || '';
-          if(m.file){
-            card.querySelector('.card-text').textContent = (m.descricao ? m.descricao + ' · ' : '') + 'PDF · clique para baixar';
-            card.addEventListener('click', ()=>downloadMemberMaterial(m.id));
-          } else if(m.link){
-            card.style.cursor = 'none';
-            card.addEventListener('click', ()=>{
-              window.open(m.link, '_blank', 'noopener');
-              apiPost('patientTrackMaterial', { idToken: patientIdToken, email: patientEmail, area: 'programa', materialId: m.id });
-            });
-          }
-          wrap.appendChild(card);
-        });
-    }
+    const materialWrap=document.getElementById('materiais-pessoais');materialWrap.innerHTML='';
+    document.getElementById('materiais-pessoais-empty').style.display=materiaisGerais.length?'none':'block';
+    materiaisGerais.forEach(m=>{
+      const card=document.createElement('div');card.className='glass-card material-action-card';card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','Abrir opções para '+(m.titulo||'material'));card.innerHTML=`<span class="card-num"></span><div class="card-title"></div><p class="card-text"></p><span class="mli-sub">Escolha ver ou salvar</span>`;
+      card.querySelector('.card-num').textContent=m.tipo||'Material';card.querySelector('.card-title').textContent=m.titulo||'';card.querySelector('.card-text').textContent=(m.descricao?m.descricao+' · ':'')+(m.file?'PDF':'Link');
+      card.addEventListener('click',()=>openMaterialActions(m));card.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openMaterialActions(m);}});materialWrap.appendChild(card);
+    });
 
     if(aulasVideos.length){
       const grid = document.getElementById('video-grid-aulas');
@@ -1146,38 +1143,6 @@
       alert(res.error || 'Não foi possível solicitar esse horário.');
     }
   }
-
-  /* ── RECEITAS: salvar receita atualiza a planilha sozinho ── */
-  document.querySelectorAll('.recipe-save-btn').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const card = btn.closest('[data-recipe-id]');
-      const recipeId = card.dataset.recipeId;
-      const recipeTitle = card.querySelector('.card-title').textContent;
-      if(!patientEmail){ alert('Faça login novamente.'); return; }
-      if(!apiConfigured()){ alert('A conexao com a plataforma nao esta disponivel. Tente novamente.'); return; }
-      btn.disabled = true;
-      btn.textContent = 'Salvando...';
-      if(isImpersonating){ alert('No modo “Ver como paciente”, receitas não são salvas em nome dela.'); btn.disabled = false; btn.textContent = 'Salvar receita'; return; }
-      const res = await apiPost('saveRecipe', { idToken: patientIdToken, email: patientEmail, recipeId: recipeId, recipeTitle: recipeTitle });
-      if(res.ok){
-        btn.textContent = 'Salvando...';
-        btn.disabled = true;
-        document.getElementById('stat-receitas').textContent = res.receitasSalvas;
-        if(!currentSavedRecipes.some(recipe=>recipe.id===recipeId)){
-          const categories={ 'bowl-anti-inflamatorio':'Salgado','overnight-oats-canela':'Doce','sopa-detox-gengibre':'Salgado' };
-          currentSavedRecipes.push({id:recipeId,titulo:recipeTitle,categoria:categories[recipeId]||'Receita',descricao:card.querySelector('.card-text').textContent||''});
-          renderSavedRecipes(currentSavedRecipes);
-        }
-
-        btn.textContent = 'Salva ✓';
-        document.getElementById('stat-receitas').textContent = res.receitasSalvas;
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Salvar receita';
-        alert(res.error || 'Não foi possível salvar a receita.');
-      }
-    });
-  });
 
   /* ── PONTOS: envio real de foto (resultado ou prato) ── */
   function wireFotoUpload(btnId, inputId, tipo){
