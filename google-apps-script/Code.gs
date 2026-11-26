@@ -79,7 +79,7 @@ function normalizeInstagramPostKey_(value) {
 
 function ensurePatientInstagramHeader_() {
   const sheet = getSheet('Pacientes');
-  ensureHeaders_(sheet, ['Instagram', 'Servico', 'GoogleFotoUrl', 'FotoPerfilFileId', 'FotoPerfilMimeType']);
+  ensureHeaders_(sheet, ['Instagram', 'Servico', 'GoogleFotoUrl', 'FotoPerfilFileId', 'FotoPerfilMimeType', 'ValorContratado']);
   return sheet;
 }
 
@@ -349,6 +349,15 @@ function actionGoogleLoginPrograma(body) {
   if (isAdmin(auth.email)) {
     return { ok: true, nome: auth.nome, email: auth.email, admin: true };
   }
+  const financialSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('FinanceiroPacientes');
+  if (financialSheet) {
+    const financePatient = sheetToObjects(financialSheet).filter(function(row) {
+      const service = normalizePatientProgram_(row.Servico);
+      return normEmail(row.Email) === normEmail(auth.email) && String(row.CadastroPendente || '').trim().toLowerCase() !== 'sim' &&
+        ['Programa Reequilíbrio', 'Consulta Dupla'].indexOf(service) !== -1;
+    })[0];
+    if (financePatient) syncMemberPatientFromFinance_(financePatient);
+  }
   const p = findPatientRow(auth.email);
   if (!p) {
     return { ok: false, error: 'Não encontramos seu cadastro no Programa com esta conta Google. Fale com a Regiane.' };
@@ -398,6 +407,10 @@ function actionDashboard(email) {
       new Date(a.IsoInicio) > new Date())
     .sort((a, b) => new Date(a.IsoInicio) - new Date(b.IsoInicio));
   const proximoAgendamento = meusAgendamentos[0] || null;
+  const proximosAtendimentos = financeiroAppointmentsForPatient_(email).filter(function(a) {
+    return a.date && new Date(a.date) > new Date() && String(a.status).toLowerCase() !== 'cancelado';
+  }).sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+  const atendimentoFinanceiro = proximosAtendimentos[0] || null;
 
   return {
     ok: true,
@@ -408,8 +421,8 @@ function actionDashboard(email) {
     retornosRealizados: Number(p.RetornosRealizados) || 0,
     receitasSalvas: Number(p.ReceitasSalvas) || 0,
     progressoPercent: Number(p.ProgressoPercent) || 0,
-    proximoRetornoData: p.ProximoRetornoData || '',
-    proximoRetornoHora: p.ProximoRetornoHora || '',
+    proximoRetornoData: atendimentoFinanceiro ? Utilities.formatDate(new Date(atendimentoFinanceiro.date), NOTIFICATION_TIMEZONE, 'dd/MM/yyyy') : proximoAgendamento ? proximoAgendamento.Data : p.ProximoRetornoData || '',
+    proximoRetornoHora: atendimentoFinanceiro ? Utilities.formatDate(new Date(atendimentoFinanceiro.date), NOTIFICATION_TIMEZONE, 'HH:mm') : proximoAgendamento ? proximoAgendamento.Hora : p.ProximoRetornoHora || '',
     planoTexto: p.PlanoTexto || '',
     planoPdfUrl: p.PlanoPdfUrl || '',
     agendamentoStatus: proximoAgendamento ? String(proximoAgendamento.Status).trim().toLowerCase() : null,
@@ -571,15 +584,21 @@ function actionAdminListPatients(body) {
   assertAdmin(body.idToken);
   ensurePatientInstagramHeader_();
   ensureGamificationSheets_();
-  const pacientes = sheetToObjects(getSheet('Pacientes'));
   const financeiroSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('FinanceiroPacientes');
   const pacientesFinanceiro = financeiroSheet ? sheetToObjects(financeiroSheet) : [];
+  pacientesFinanceiro.forEach(function(financePatient) {
+    if (String(financePatient.CadastroPendente || '').trim().toLowerCase() !== 'sim') syncMemberPatientFromFinance_(financePatient);
+  });
+  const pacientes = sheetToObjects(getSheet('Pacientes'));
   return {
     ok: true,
     pacientes: pacientes.map(function(p) {
       const pontosTotal = Number(p.PontosTotal) || 0;
       const credito = creditSummary_(p.Email, pontosTotal);
       const fotos = sheetToObjects(getSheet('Fotos')).filter(function(f) { return normEmail(f.Email) === normEmail(p.Email); }).length;
+      const financeiroPatient = pacientesFinanceiro.filter(function(fp) { return normEmail(fp.Email) === normEmail(p.Email) && financeiroService_(fp.Servico) === financeiroService_(resolvePatientProgram_(p, pacientesFinanceiro)); })[0];
+      const appointments = financeiroAppointmentsForPatient_(p.Email);
+      const totalPago = appointments.reduce(function(sum,a) { return sum + Number(a.paid || 0); },0);
       return {
         email: p.Email,
         nome: p.Nome,
@@ -597,10 +616,43 @@ function actionAdminListPatients(body) {
         progressoPercent: Number(p.ProgressoPercent) || 0,
         temPlano: !!(p.PlanoTexto && String(p.PlanoTexto).trim()),
         planoTexto: p.PlanoTexto || '',
-        planoPdfUrl: p.PlanoPdfUrl || ''
+        planoPdfUrl: p.PlanoPdfUrl || '',
+        valorContratado: financeiroPatient ? Number(financeiroPatient.ValorContratado) || 0 : 0,
+        valorRecebido: totalPago
       };
     })
   };
+}
+
+function syncMemberPatientFromFinance_(financePatient) {
+  const email = normEmail(financePatient.Email);
+  const service = normalizePatientProgram_(financePatient.Servico);
+  if (!email || email.indexOf('@') === -1 || ['Programa Reequilíbrio', 'Consulta Dupla'].indexOf(service) === -1 ||
+      String(financePatient.CadastroPendente || '').trim().toLowerCase() === 'sim') return false;
+  const sheet = ensurePatientInstagramHeader_();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const rowIndex = data.findIndex(function(row, index) { return index > 0 && normEmail(row[emailCol]) === email; });
+  const contract = Number(financePatient.ValorContratado) || 0;
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex + 1, headers.indexOf('Nome') + 1).setValue(financePatient.Nome || data[rowIndex][headers.indexOf('Nome')]);
+    sheet.getRange(rowIndex + 1, headers.indexOf('Servico') + 1).setValue(service);
+    sheet.getRange(rowIndex + 1, headers.indexOf('ValorContratado') + 1).setValue(contract);
+    return false;
+  }
+  const row = headers.map(function() { return ''; });
+  row[emailCol] = email;
+  row[headers.indexOf('Nome')] = financePatient.Nome || email;
+  row[headers.indexOf('DataInicio')] = financePatient.CriadoEm || '';
+  row[headers.indexOf('RetornosRealizados')] = 0;
+  row[headers.indexOf('ReceitasSalvas')] = 0;
+  row[headers.indexOf('ProgressoPercent')] = 0;
+  row[headers.indexOf('PontosTotal')] = 0;
+  row[headers.indexOf('Servico')] = service;
+  row[headers.indexOf('ValorContratado')] = contract;
+  sheet.appendRow(row);
+  return true;
 }
 
 function creditSummary_(email, pontosTotal) {
@@ -698,10 +750,18 @@ function actionAdminAddPatient(body) {
   const instagram = normalizeInstagramProfile_(body.instagram);
   const requestedService = String(body.servico || body.service || '').trim();
   const servico = requestedService ? normalizePatientProgram_(requestedService) : '';
+  const valorContratado = body.valorContratado === undefined || body.valorContratado === '' ? null : Number(String(body.valorContratado).replace(',', '.'));
+  const pagamentoRecebido = body.pagamentoRecebido === undefined || body.pagamentoRecebido === '' ? null : Number(String(body.pagamentoRecebido).replace(',', '.'));
+  const formaPagamento = String(body.formaPagamento || '').trim();
+  const pagamentoConfirmado = body.pagamentoConfirmado === true || String(body.pagamentoConfirmado).toLowerCase() === 'true';
+  if (pagamentoRecebido !== null && pagamentoRecebido > 0 && !formaPagamento) return { ok:false, error:'Escolha uma forma de pagamento para o valor recebido.' };
+  if (pagamentoRecebido !== null && pagamentoRecebido > 0 && !pagamentoConfirmado) return { ok:false, error:'Confirme que esse valor já foi recebido.' };
   if (!email || email.indexOf('@') === -1 || !nome) {
     return { ok: false, error: 'Informe o nome e um e-mail válido.' };
   }
   if (requestedService && !servico) return { ok: false, error: 'Escolha Consulta Dupla ou Programa Reequilíbrio.' };
+  if (valorContratado !== null && (!isFinite(valorContratado) || valorContratado < 0)) return { ok: false, error: 'Valor contratado inválido.' };
+  if (pagamentoRecebido !== null && (!isFinite(pagamentoRecebido) || pagamentoRecebido < 0 || valorContratado === null || pagamentoRecebido > valorContratado)) return { ok: false, error: 'Informe o valor contratado e um pagamento válido, sem ultrapassar o total.' };
 
   const sheet = ensurePatientInstagramHeader_();
   const data = sheet.getDataRange().getValues();
@@ -714,7 +774,8 @@ function actionAdminAddPatient(body) {
       sheet.getRange(i + 1, nomeCol + 1).setValue(nome);
       if (instagram) sheet.getRange(i + 1, instagramCol + 1).setValue(instagram);
       if (servico) sheet.getRange(i + 1, headers.indexOf('Servico') + 1).setValue(servico);
-      return { ok: true, created: false };
+      const financial = syncFinanceiroPatientFromMember_(body, { email: email, nome: nome, servico: servico || normalizePatientProgram_(data[i][headers.indexOf('Servico')]) || 'Programa Reequilíbrio', valorContratado: valorContratado, pagamentoRecebido: pagamentoRecebido, formaPagamento: formaPagamento });
+      return { ok: true, created: false, financeiroPatientId: financial.patientId };
     }
   }
 
@@ -729,7 +790,68 @@ function actionAdminAddPatient(body) {
   row[instagramCol] = instagram;
   row[headers.indexOf('Servico')] = servico || 'Programa Reequilíbrio';
   sheet.appendRow(row);
-  return { ok: true, created: true };
+  const financial = syncFinanceiroPatientFromMember_(body, { email: email, nome: nome, servico: servico || 'Programa Reequilíbrio', valorContratado: valorContratado, pagamentoRecebido: pagamentoRecebido, formaPagamento: formaPagamento });
+  return { ok: true, created: true, financeiroPatientId: financial.patientId };
+}
+
+function syncFinanceiroPatientFromMember_(body, patient) {
+  const sheets = ensureFinanceiroSheets_();
+  const service = financeiroService_(patient.servico);
+  const formaPagamento = String(patient.formaPagamento || '').trim();
+  const data = sheets.pacientes.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf('Email');
+  const serviceCol = headers.indexOf('Servico');
+  const patientSheet = getSheet('Pacientes');
+  const patientData = patientSheet.getDataRange().getValues();
+  const patientHeaders = patientData[0];
+  const memberRow = patientData.findIndex(function(row, index) { return index > 0 && normEmail(row[patientHeaders.indexOf('Email')]) === patient.email; });
+  const memberContract = memberRow > 0 && patientHeaders.indexOf('ValorContratado') !== -1 ? Number(patientData[memberRow][patientHeaders.indexOf('ValorContratado')]) || 0 : 0;
+  const contractValue = patient.valorContratado === null ? memberContract : patient.valorContratado;
+  const memberValueColumn = patientHeaders.indexOf('ValorContratado');
+  if (memberRow > 0 && memberValueColumn !== -1 && patient.valorContratado !== null) {
+    patientSheet.getRange(memberRow + 1, memberValueColumn + 1).setValue(contractValue);
+  }
+  let row = 0;
+  let id = '';
+  for (let i = 1; i < data.length; i++) {
+    if (normEmail(data[i][emailCol]) === patient.email && financeiroService_(data[i][serviceCol]) === service) { row = i + 1; id = String(data[i][headers.indexOf('Id')] || ''); break; }
+  }
+  const now = new Date();
+  if (!row) {
+    id = Utilities.getUuid();
+    const values = { Id:id, Email:patient.email, Nome:patient.nome, Servico:service, ValorContratado:contractValue,
+      Origem:'Painel de pacientes', CadastroPendente:'Não', CriadoEm:now, AtualizadoEm:now };
+    sheets.pacientes.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+  } else {
+    if (contractValue || patient.valorContratado !== null) sheets.pacientes.getRange(row, headers.indexOf('ValorContratado') + 1).setValue(contractValue);
+    sheets.pacientes.getRange(row, headers.indexOf('Nome') + 1).setValue(patient.nome);
+    sheets.pacientes.getRange(row, headers.indexOf('Origem') + 1).setValue('Painel de pacientes');
+    sheets.pacientes.getRange(row, headers.indexOf('CadastroPendente') + 1).setValue('Não');
+    sheets.pacientes.getRange(row, headers.indexOf('AtualizadoEm') + 1).setValue(now);
+  }
+  if (patient.pagamentoRecebido !== null && patient.pagamentoRecebido > 0) {
+    const paymentSheet = getSheet('Financeiro');
+    const appointmentData = sheets.atendimentos.getDataRange().getValues();
+    const appointmentHeaders = appointmentData[0];
+    const existingSourcePayments = sheetToObjects(paymentSheet).filter(function(p) {
+      return normEmail(p.Email) === patient.email && String(p.Servico || '') === service && String(p.Descricao || '') === 'Pagamento informado no cadastro da paciente' && String(p.Status || '').toLowerCase() === 'recebido';
+    }).reduce(function(sum,p) { return sum + (Number(p.Valor) || 0); },0);
+    const previous = appointmentData.slice(1).filter(function(a) { return normEmail(a[appointmentHeaders.indexOf('Email')]) === patient.email && String(a[appointmentHeaders.indexOf('Servico')]) === service; }).reduce(function(sum,a) { return sum + (Number(a[appointmentHeaders.indexOf('Recebido')]) || 0); },0);
+    const remaining = Math.max(0, patient.pagamentoRecebido - Math.max(previous, existingSourcePayments));
+    if (remaining > 0) {
+      const paymentId = Utilities.getUuid();
+      const appointmentId = Utilities.getUuid();
+      const values = { Id:appointmentId, PacienteId:id, Email:patient.email, Servico:service, Encontro:service === 'Consulta Dupla' ? 'Consulta 1' : '',
+        DataHora:'', Valor:remaining, Recebido:remaining, Status:'financeiro', CreditoMantido:'Não', Reagendamentos:0,
+        OrigemAgenda:'cadastro de paciente', CriadoEm:now, AtualizadoEm:now };
+      sheets.atendimentos.appendRow(appointmentHeaders.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+      const next = Math.max(5, paymentSheet.getLastRow() + 1);
+      paymentSheet.getRange(next, 1, 1, 9).setValues([[now, patient.email, patient.nome, service,
+        'Pagamento informado no cadastro da paciente', remaining, 'Recebido', formaPagamento, 'Lançado pelo painel administrativo']]);
+    }
+  }
+  return { patientId:id, service:service };
 }
 
 function actionAdminRemovePatient(body) {
@@ -1007,6 +1129,11 @@ function normalizeTimes_(value) {
 
 function notificationDateKey_(value) {
   if (!value) return '';
+  if (value instanceof Date && !isNaN(value.getTime())) return Utilities.formatDate(value, NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  if (typeof value === 'number' && isFinite(value)) {
+    const serialDate = new Date(Date.UTC(1899, 11, 30) + value * 86400000);
+    return Utilities.formatDate(serialDate, NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  }
   const text = String(value).trim();
   const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return iso[1] + iso[2] + iso[3];
@@ -1045,6 +1172,11 @@ function actionAdminSaveRoutine(body) {
   if (!paciente) return { ok: false, error: 'Paciente não encontrada na aba Pacientes.' };
   const titulo = String(body.titulo || '').trim();
   if (!titulo) return { ok: false, error: 'Informe o título da orientação.' };
+  const startKey = notificationDateKey_(body.dataInicio);
+  const endKey = notificationDateKey_(body.dataFim);
+  const todayKey = Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  if (endKey && startKey && endKey < startKey) return { ok:false, error:'A data final precisa ser igual ou posterior à data inicial.' };
+  if (endKey && endKey < todayKey) return { ok:false, error:'A data final desta orientação já passou.' };
   const horarios = normalizeTimes_(body.horarios);
   if (!horarios) return { ok: false, error: 'Informe pelo menos um horário no formato HH:MM.' };
   const sheets = ensureNotificationSheets_();
@@ -1052,9 +1184,13 @@ function actionAdminSaveRoutine(body) {
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const id = String(body.id || new Date().getTime());
+  const metaValor = body.metaValor === undefined || body.metaValor === '' ? '' : Number(String(body.metaValor).replace(',', '.'));
+  const metaUnidade = String(body.metaUnidade || '').trim();
+  if (metaValor !== '' && (!isFinite(metaValor) || metaValor < 0)) return { ok:false, error:'Informe uma meta numérica válida.' };
+  if (metaValor !== '' && !metaUnidade) return { ok:false, error:'Informe a unidade da meta (por exemplo, litros por dia ou ml por lembrete).' };
   const values = {
     Id: id, Email: email, Titulo: titulo, Categoria: body.categoria || 'Rotina',
-    MetaValor: body.metaValor || '', MetaUnidade: body.metaUnidade || '',
+    MetaValor: metaValor, MetaUnidade: metaUnidade,
     DiasSemana: body.diasSemana || 'SEG,TER,QUA,QUI,SEX,SAB,DOM', Horarios: horarios,
     Mensagem: body.mensagem || ('Está na hora de: ' + titulo), Ativo: body.ativo === false ? 'Não' : 'Sim',
     DataInicio: body.dataInicio || '', DataFim: body.dataFim || '', AtualizadoEm: new Date()
@@ -1093,6 +1229,7 @@ function actionAdminDeleteRoutine(body) {
 
 function actionPatientRoutineData(body) {
   const email = patientEmailFromToken_(body);
+  const paciente = findPatientRow(email);
   const routines = routineObjects_().filter(function(r) {
     return normEmail(r.Email) === email && isRoutineActiveToday_(r);
   }).map(function(r) {
@@ -1101,13 +1238,35 @@ function actionPatientRoutineData(body) {
       metaUnidade: r.MetaUnidade || '', diasSemana: r.DiasSemana || '', horarios: r.Horarios || '', mensagem: r.Mensagem || ''
     };
   });
+  const futureRoutines = routineObjects_().filter(function(r) {
+    return normEmail(r.Email) === email && String(r.Ativo).trim().toLowerCase() !== 'não' && String(r.Ativo).trim().toLowerCase() !== 'nao' && notificationDateKey_(r.DataInicio) > Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  }).map(function(r) {
+    return { id:String(r.Id), titulo:r.Titulo || '', categoria:r.Categoria || '', metaValor:r.MetaValor || '', metaUnidade:r.MetaUnidade || '', diasSemana:r.DiasSemana || '', horarios:r.Horarios || '', mensagem:r.Mensagem || '', dataInicio:r.DataInicio || '', dataFim:r.DataFim || '' };
+  });
   const notifications = notificationObjects_().filter(function(n) { return normEmail(n.Email) === email; })
     .sort(function(a, b) { return new Date(b.AgendadaPara) - new Date(a.AgendadaPara); }).slice(0, 50)
     .map(function(n) {
       return { id: String(n.Id), rotinaId: String(n.RotinaId || ''), titulo: n.Titulo || '', mensagem: n.Mensagem || '',
         agendadaPara: n.AgendadaPara || '', lida: !!n.LidaEm, concluida: !!n.ConcluidaEm, status: n.Status || '' };
     });
-  return { ok: true, email: email, rotinas: routines, notificacoes: notifications, naoLidas: notifications.filter(function(n) { return !n.lida; }).length };
+  const agendamentos = sheetToObjects(getSheet('Agendamentos')).filter(function(a) {
+    return normEmail(a.Email) === email && a.IsoInicio && ['solicitado', 'confirmado'].indexOf(String(a.Status).trim().toLowerCase()) !== -1 && new Date(a.IsoInicio) > new Date();
+  }).map(function(a) { return { data: a.Data || '', hora: a.Hora || '', status: String(a.Status).toLowerCase(), origem: 'agenda' }; });
+  const atendimentos = financeiroAppointmentsForPatient_(email).filter(function(a) {
+    return a.date && new Date(a.date) > new Date() && String(a.status).toLowerCase() !== 'cancelado';
+  }).map(function(a) { return { data: Utilities.formatDate(new Date(a.date), NOTIFICATION_TIMEZONE, 'dd/MM/yyyy'), hora: Utilities.formatDate(new Date(a.date), NOTIFICATION_TIMEZONE, 'HH:mm'), status: a.status, origem: 'financeiro' }; });
+  const proximasConsultas = atendimentos.concat(agendamentos).sort(function(a, b) {
+    const pa = a.data.split('/'); const pb = b.data.split('/');
+    return new Date(pa.length === 3 ? pa[2] + '-' + pa[1] + '-' + pa[0] + 'T' + (a.hora || '00:00') : a.data) - new Date(pb.length === 3 ? pb[2] + '-' + pb[1] + '-' + pb[0] + 'T' + (b.hora || '00:00') : b.data);
+  });
+  const next = proximasConsultas[0] || (paciente && paciente.ProximoRetornoData ? { data: paciente.ProximoRetornoData, hora: paciente.ProximoRetornoHora || '', status: 'confirmado', origem: 'cadastro' } : null);
+  const notificationValues = notificationObjects_().filter(function(n) { return normEmail(n.Email) === email && String(n.RotinaId || '').indexOf('rotina-') !== 0 && String(n.RotinaId || '').indexOf('plano') === -1; });
+  const directNotifications = notificationValues.map(function(n) {
+    return { id:String(n.Id), rotinaId:String(n.RotinaId || ''), titulo:n.Titulo || '', mensagem:n.Mensagem || '', agendadaPara:n.AgendadaPara || '', lida:!!n.LidaEm, concluida:!!n.ConcluidaEm, status:n.Status || '' };
+  });
+  return { ok: true, email: email, nome: paciente ? paciente.Nome || '' : '', rotinas: routines, rotinasFuturas:futureRoutines, notificacoes: notifications,
+    notificacoesPaciente: directNotifications, proximasConsultas: proximasConsultas, proximaConsulta: next,
+    naoLidas: notifications.concat(directNotifications).filter(function(n) { return !n.lida; }).length };
 }
 
 function actionPatientCompleteRoutine(body) {
@@ -1346,10 +1505,11 @@ function actionAddComment(body) {
     const comentariosHoje = anteriores.filter(function(c) { return sameLocalDay_(c.DataHora, new Date()) && Number(c.PontosConcedidos) > 0; }).length;
 
     id = 'comentario-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
-    pontosConcedidos = (!duplicadoRecente && comentariosHoje < 10) ? 3 : 0;
+    const pontosInteracao = hasImage && !texto ? 5 : 3;
+    pontosConcedidos = (!duplicadoRecente && comentariosHoje < 10) ? pontosInteracao : 0;
     sheets.comentarios.appendRow([id, body.postId, email, p.Nome, texto, new Date(), '', 'Pendente', pontosConcedidos, storedImage ? storedImage.id : '', storedImage ? storedImage.mimeType : '']);
     row = sheets.comentarios.getLastRow();
-    if (pontosConcedidos) addPointsUnlocked_(email, 'Comentário na comunidade', pontosConcedidos, id);
+    if (pontosConcedidos) addPointsUnlocked_(email, hasImage && !texto ? 'Foto do prato na comunidade' : 'Comentário na comunidade', pontosConcedidos, id);
   } finally {
     lock.releaseLock();
   }
@@ -2380,7 +2540,7 @@ function syncFinanceiroPatientsFromSources_(sheets) {
       const key = email + '|' + source.service.toLowerCase();
       if (keys[key]) return;
       const now = new Date();
-      target.appendRow([Utilities.getUuid(), email, p.Nome || email, source.service, source.price, source.sheet, source.price === '' ? 'Sim' : 'Não', now, now]);
+      target.appendRow([Utilities.getUuid(), email, p.Nome || email, source.service, Number(source.price) || 0, source.sheet, source.price === '' ? 'Sim' : 'Não', now, now]);
       keys[key] = true;
     });
   });
@@ -2404,6 +2564,13 @@ function financeiroPatientOutput_(p) {
     service: String(p.Servico || ''), value: Number(p.ValorContratado) || 0,
     source: String(p.Origem || ''), pending: String(p.CadastroPendente || '').toLowerCase() === 'sim'
   };
+}
+
+function financeiroAppointmentsForPatient_(email) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName('FinanceiroAtendimentos');
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheetToObjects(sheet).filter(function(a) { return normEmail(a.Email) === normEmail(email); }).map(financeiroAppointmentOutput_);
 }
 
 function financeiroAppointmentOutput_(a) {
@@ -2455,7 +2622,20 @@ function syncMemberAccessFromFinance_(body, service, email, name) {
   }
   const result = actionAdminAddPatient(accessBody);
   if (!result.ok) throw new Error(result.error || 'Não foi possível liberar a Área de Pacientes.');
-  return { area: 'programa', created: !!result.created };
+  const sourcePatient = findPatientRow(email);
+  const synced = syncFinanceiroPatientFromMember_({ idToken:body.idToken }, { email:normEmail(email), nome:name, servico:service,
+    valorContratado:sourcePatient ? Number(sourcePatient.ValorContratado) || null : null, pagamentoRecebido:null, formaPagamento:'' });
+  const financeSheet = ensureFinanceiroSheets_().pacientes;
+  const rows = financeSheet.getDataRange().getValues();
+  const headers = rows[0];
+  for (let i = 1; i < rows.length; i++) {
+    if (normEmail(rows[i][headers.indexOf('Email')]) === normEmail(email) && financeiroService_(rows[i][headers.indexOf('Servico')]) === service) {
+      const currentValue = Number(rows[i][headers.indexOf('ValorContratado')]) || 0;
+          const value = sourcePatient ? Number(sourcePatient.ValorContratado) || 0 : 0;
+          if (value && !currentValue) financeSheet.getRange(i + 1, headers.indexOf('ValorContratado') + 1).setValue(value);
+    }
+  }
+  return { area: 'programa', created: !!result.created, patientId:synced.patientId };
 }
 
 function actionFinanceiroSavePatient(body) {
@@ -2465,6 +2645,7 @@ function actionFinanceiroSavePatient(body) {
   const name = String(item.name || '').trim();
   if (!email || email.indexOf('@') === -1 || !name) throw new Error('Informe nome e e-mail válidos.');
   const service = financeiroService_(item.service);
+  const contractValue = Number(item.value) || 0;
   const id = String(item.id || Utilities.getUuid());
   const sheet = ensureFinanceiroSheets_().pacientes;
   const data = sheet.getDataRange().getValues();
@@ -2474,7 +2655,7 @@ function actionFinanceiroSavePatient(body) {
   const serviceCol = headers.indexOf('Servico');
   const now = new Date();
   let persistedId = id;
-  const values = { Id:id, Email:email, Nome:name, Servico:service, ValorContratado:Number(item.value)||0, Origem:item.source||'Sistema financeiro', CadastroPendente:'Não', AtualizadoEm:now };
+  const values = { Id:id, Email:email, Nome:name, Servico:service, ValorContratado:contractValue, Origem:item.source||'Sistema financeiro', CadastroPendente:'Não', AtualizadoEm:now };
   let created = true;
   for (let i = 1; i < data.length; i++) {
     const sameId = String(data[i][idCol]) === id;
@@ -2489,6 +2670,20 @@ function actionFinanceiroSavePatient(body) {
   }
   if (created) sheet.appendRow(headers.map(function(h) { return h === 'CriadoEm' ? now : values[h] !== undefined ? values[h] : ''; }));
   const memberAccess = syncMemberAccessFromFinance_(body, service, email, name);
+  if (service === 'Programa Reequilíbrio' || service === 'Acompanhamento de 5 meses' || service === 'Consulta Dupla') {
+    const members = ensurePatientInstagramHeader_();
+    const memberData = members.getDataRange().getValues();
+    const memberHeaders = memberData[0];
+    for (let i = 1; i < memberData.length; i++) {
+      if (normEmail(memberData[i][memberHeaders.indexOf('Email')]) === email) {
+        const memberService = normalizePatientProgram_(memberData[i][memberHeaders.indexOf('Servico')]);
+        if (memberService === normalizePatientProgram_(service)) {
+          members.getRange(i + 1, memberHeaders.indexOf('Servico') + 1).setValue(service);
+          members.getRange(i + 1, memberHeaders.indexOf('ValorContratado') + 1).setValue(contractValue);
+        }
+      }
+    }
+  }
   return { ok:true, patientId:persistedId, created:created, memberAccess:memberAccess };
 }
 

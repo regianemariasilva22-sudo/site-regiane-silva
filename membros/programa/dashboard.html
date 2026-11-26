@@ -185,8 +185,17 @@
       <h1 class="mem-hello" style="font-size:28px;">Minha rotina</h1>
       <p class="mem-sub">Suas metas e os lembretes individuais definidos pela Regiane.</p>
 
+      <div class="mem-panel" id="patient-next-appointment" style="margin-bottom:22px;display:none;">
+        <h3 style="margin-bottom:8px;">Próxima consulta</h3>
+        <p class="card-text" id="patient-next-appointment-value"></p>
+        <p class="card-text" id="patient-next-appointment-status" style="margin-top:4px;color:var(--muted);"></p>
+      </div>
+
       <h3 style="margin:24px 0 12px;">Orientações ativas</h3>
       <div id="patient-routines-list"><p class="card-text" style="color:var(--muted);">Carregando suas orientações...</p></div>
+
+      <h3 style="margin:28px 0 12px;">Metas e orientações futuras</h3>
+      <div id="patient-upcoming-routines-list" class="mem-panel"><p class="card-text" style="color:var(--muted);">Carregando orientações programadas...</p></div>
 
       <h3 style="margin:32px 0 12px;">Central de notificações</h3>
       <div id="patient-notifications-list"><p class="card-text" style="color:var(--muted);">Carregando notificações...</p></div>
@@ -494,6 +503,12 @@
           <select id="admin-patient-service" aria-label="Tipo de consulta ou programa" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;">
             <option value="Programa Reequilíbrio">Programa Reequilíbrio</option>
             <option value="Consulta Dupla">Consulta Dupla</option>
+          </select>
+          <input id="admin-patient-contract-value" type="number" min="0" step="0.01" placeholder="Valor contratado (R$)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="admin-patient-paid-value" type="number" min="0" step="0.01" placeholder="Valor já recebido (R$)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);"><input id="admin-patient-payment-confirmed" type="checkbox" /> Confirmo que este valor já foi recebido</label>
+          <select id="admin-patient-payment-method" aria-label="Forma de pagamento" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;">
+            <option value="">Forma de pagamento (se informou valor recebido)</option><option>Pix</option><option>Cartão de crédito</option><option>Cartão de débito</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
           </select>
           <input id="admin-patient-instagram" type="text" placeholder="Instagram (opcional)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
         </div>
@@ -828,6 +843,14 @@
     const badge = document.getElementById('notification-badge');
     badge.textContent = res.naoLidas || 0;
     badge.style.display = res.naoLidas ? 'inline-flex' : 'none';
+    const nextWrap=document.getElementById('patient-next-appointment');
+    if(nextWrap){
+      if(res.proximaConsulta){
+        nextWrap.style.display='block';
+        document.getElementById('patient-next-appointment-value').textContent=[res.proximaConsulta.data,res.proximaConsulta.hora].filter(Boolean).join(' · ');
+        document.getElementById('patient-next-appointment-status').textContent=res.proximaConsulta.status==='solicitado'?'Solicitação aguardando confirmação da Regiane.':'Consulta confirmada.';
+      }else nextWrap.style.display='none';
+    }
     routinesWrap.innerHTML = '';
     if(!res.rotinas.length) routinesWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma orientação ativa no momento.</p>';
     res.rotinas.forEach(r=>{
@@ -850,9 +873,25 @@
       });
       routinesWrap.appendChild(card);
     });
+    const futureWrap=document.getElementById('patient-upcoming-routines-list');
+    if(futureWrap){
+      futureWrap.innerHTML='';
+      if(!res.rotinasFuturas || !res.rotinasFuturas.length) futureWrap.innerHTML='<p class="card-text" style="color:var(--muted);">Nenhuma meta programada para começar depois.</p>';
+      (res.rotinasFuturas || []).forEach(r=>{
+        const item=document.createElement('div'); item.className='mem-list-item';
+        const info=document.createElement('div'); info.style.flex='1';
+        const title=document.createElement('div'); title.className='mli-title'; title.textContent=r.titulo || r.categoria || 'Orientação';
+        const detail=document.createElement('div'); detail.className='mli-sub';
+        const meta=[r.metaValor,r.metaUnidade].filter(Boolean).join(' ');
+        detail.textContent=[meta,r.dataInicio?'Início em '+new Date(r.dataInicio).toLocaleDateString('pt-BR'):'' ,r.diasSemana,r.horarios].filter(Boolean).join(' · ');
+        const message=document.createElement('p'); message.className='card-text'; message.textContent=r.mensagem || '';
+        info.append(title,detail,message); item.appendChild(info); futureWrap.appendChild(item);
+      });
+    }
     notificationsWrap.innerHTML = '';
-    if(!res.notificacoes.length) notificationsWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma notificação ainda.</p>';
-    res.notificacoes.forEach(n=>{
+    const patientNotifications=(res.notificacoes || []).concat(res.notificacoesPaciente || []);
+    if(!patientNotifications.length) notificationsWrap.innerHTML = '<p class="card-text" style="color:var(--muted);">Nenhuma notificação ainda.</p>';
+    patientNotifications.forEach(n=>{
       const item = document.createElement('div');
       item.className = 'mem-list-item';
       item.style.background = n.lida ? 'transparent' : 'var(--rose-mist)';
@@ -1221,6 +1260,7 @@
             <p class="card-text" style="margin:2px 0 0;">${p.email} · ${p.diasAcompanhamento} dias · ${p.pontosTotal} pontos · ${p.receitasSalvas} receitas salvas · ${p.fotosTotal || 0} fotos</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Instagram:</strong> ${p.instagram || 'não cadastrado'}</p>
             <p class="card-text" style="margin:4px 0 0;"><strong>Crédito:</strong> R$ ${Number(p.creditoDisponivel || 0).toFixed(2).replace('.', ',')} disponível · R$ ${Number(p.creditoUsado || 0).toFixed(2).replace('.', ',')} utilizado · R$ ${Number(p.creditoGerado || 0).toFixed(2).replace('.', ',')} gerado</p>
+            <p class="card-text" style="margin:4px 0 0;"><strong>Financeiro:</strong> R$ ${Number(p.valorContratado||0).toFixed(2).replace('.', ',')} contratado · R$ ${Number(p.valorRecebido||0).toFixed(2).replace('.', ',')} recebido</p>
           </div>
           <span class="mli-tag" style="background:${p.temPlano ? 'var(--rose-mist)' : '#F4C6C6'};color:${p.temPlano ? 'var(--marsala-deep)' : '#7A2222'};">${p.temPlano ? 'Com plano' : 'Sem plano — pendente'}</span>
         </div>
@@ -1349,16 +1389,24 @@
       const email = document.getElementById('admin-patient-email').value.trim();
       const servico = document.getElementById('admin-patient-service').value;
       const instagram = document.getElementById('admin-patient-instagram').value.trim();
+      const valorContratado = document.getElementById('admin-patient-contract-value').value;
+      const pagamentoRecebido = document.getElementById('admin-patient-paid-value').value;
+      const formaPagamento = document.getElementById('admin-patient-payment-method').value;
+      const pagamentoConfirmado = document.getElementById('admin-patient-payment-confirmed').checked;
       const status = document.getElementById('admin-patient-status');
       if(!nome || !email){ status.textContent = 'Informe nome e e-mail.'; return; }
       adminPatientAddBtn.disabled = true;
-      const res = await apiPost('adminAddPatient', { idToken: patientIdToken, nome, email, instagram, servico });
+      const res = await apiPost('adminAddPatient', { idToken: patientIdToken, nome, email, instagram, servico, valorContratado, pagamentoRecebido, formaPagamento, pagamentoConfirmado });
       adminPatientAddBtn.disabled = false;
       status.textContent = res.ok ? 'Paciente adicionada ✓' : (res.error || 'Erro ao adicionar.');
       if(res.ok){
         document.getElementById('admin-patient-name').value = '';
         document.getElementById('admin-patient-email').value = '';
         document.getElementById('admin-patient-instagram').value = '';
+        document.getElementById('admin-patient-contract-value').value = '';
+        document.getElementById('admin-patient-paid-value').value = '';
+        document.getElementById('admin-patient-payment-method').value = '';
+        document.getElementById('admin-patient-payment-confirmed').checked = false;
         loadAdminPatients();
       }
     });
