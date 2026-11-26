@@ -120,29 +120,17 @@
       <div class="mem-grid">
         <div class="mem-panel reveal in">
           <h3>Próximos passos</h3>
-          <div class="mem-list-item">
+
+          <div class="mem-list-item" id="home-appointment-step" style="display:none;cursor:pointer;" role="button" tabindex="0">
             <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
-            <div>
-              <div class="mli-title">Retorno de acompanhamento</div>
-              <div class="mli-sub" id="proximo-retorno-sub">28 de julho · 15h00 · Online</div>
-            </div>
+            <div><div class="mli-title" id="proximo-retorno-title">Proximo atendimento</div><div class="mli-sub" id="proximo-retorno-sub"></div></div>
             <div class="mli-tag" id="proximo-retorno-tag" style="display:none;">Agendado</div>
           </div>
-          <div class="mem-list-item">
-            <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
-            <div>
-              <div class="mli-title">Nova aula liberada: Intestino e imunidade</div>
-              <div class="mli-sub">Assista na aba Aulas &amp; Vídeos</div>
-            </div>
-            <div class="mli-tag">Novo</div>
+          <div class="mem-list-item" id="home-latest-lesson" style="display:none;cursor:pointer;" role="button" tabindex="0">
+            <div class="mli-icon">&#9654;</div><div><div class="mli-title" id="home-latest-lesson-title"></div><div class="mli-sub">Abra em Aulas &amp; Videos</div></div><div class="mli-tag">Novo</div>
           </div>
-          <div class="mem-list-item">
-            <div class="mli-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg></div>
-            <div>
-              <div class="mli-title">Desafio de 7 dias — Intestino em dia</div>
-              <div class="mli-sub">Comece quando quiser, no seu ritmo</div>
-            </div>
-            <div class="mli-tag">Novo</div>
+          <div class="mem-list-item" id="home-next-live" style="display:none;cursor:pointer;" role="button" tabindex="0">
+            <div class="mli-icon">&#9733;</div><div><div class="mli-title" id="home-next-live-title"></div><div class="mli-sub" id="home-next-live-sub"></div></div><div class="mli-tag">Ao vivo</div>
           </div>
 
           <div id="program-progress-section">
@@ -154,33 +142,23 @@
 
         <div class="mem-panel reveal in d1">
           <h3>Comunidade — atividade recente</h3>
-          <div class="mem-list-item" style="border:none;padding:10px 0;">
-            <div class="mem-avatar" style="width:34px;height:34px;"></div>
-            <div>
-              <div class="mli-title">Marta comentou na Live de julho</div>
-              <div class="mli-sub">há 2 horas</div>
-            </div>
-          </div>
-          <div class="mem-list-item" style="border:none;padding:10px 0;">
-            <div class="mem-avatar" style="width:34px;height:34px;"></div>
-            <div>
-              <div class="mli-title">Nova receita: bowl anti-inflamatório</div>
-              <div class="mli-sub">há 1 dia</div>
-            </div>
-          </div>
-          <div class="mem-list-item" style="border:none;padding:10px 0;">
-            <div class="mem-avatar" style="width:34px;height:34px;"></div>
-            <div>
-              <div class="mli-title">Live mensal: Intestino &amp; imunidade</div>
-              <div class="mli-sub">Sexta, 20h</div>
-            </div>
-          </div>
+          <div id="home-community-activity"><p class="card-text" style="color:var(--muted);">Nenhuma atividade recente.</p></div>
           <a href="#comunidade" onclick="showTab('comunidade');return false;" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:10px;">Ver comunidade &nbsp;→</a>
         </div>
       </div>
     </div>
 
-    <!-- NOTIFICAÇÕES E ROTINAS TAB -->
+    <div id="appointment-detail-modal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(30,20,22,.55);align-items:center;justify-content:center;padding:20px;">
+  <div role="dialog" aria-modal="true" aria-labelledby="appointment-detail-title" class="mem-panel" style="width:min(100%,480px);">
+    <h3 id="appointment-detail-title">Seu atendimento</h3><p class="card-text" id="appointment-detail-date"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px;">
+      <button type="button" class="btn btn-outline btn-sm" id="appointment-reschedule">Solicitar reagendamento</button>
+      <button type="button" class="btn btn-primary btn-sm" id="appointment-confirm-ok">Esta tudo certo</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICAÇÕES E ROTINAS TAB -->
     <div id="tab-notificacoes" style="display:none;">
       <h1 class="mem-hello" style="font-size:28px;">Minha rotina</h1>
       <p class="mem-sub">Suas metas e os lembretes individuais definidos pela Regiane.</p>
@@ -331,21 +309,17 @@
       <div class="mem-community">
         <div class="comm-card">
           <div class="comm-avatars"><span></span><span></span><span></span></div>
-          <div class="h3" style="font-size:16px;">Diário de conquistas</div>
+          <div class="h3" style="font-size:16px;">Di?rio de conquistas</div>
           <p class="card-text" style="margin-top:8px;">Compartilhe seus resultados e celebre com o grupo.</p>
         </div>
-        <div class="comm-card">
-          <div class="comm-avatars"><span></span><span></span></div>
-          <div class="h3" style="font-size:16px;">Live mensal</div>
-          <p class="card-text" style="margin-top:8px;">Intestino &amp; imunidade — sexta-feira às 20h.</p>
-        </div>
-        <div class="comm-card">
-          <div class="comm-avatars"><span></span><span></span><span></span></div>
-          <div class="h3" style="font-size:16px;">Desafio do mês</div>
-          <p class="card-text" style="margin-top:8px;">7 dias para reorganizar sua rotina alimentar.</p>
-        </div>
       </div>
+      <div id="community-live-events"></div>
 
+      <div class="feed-post" id="community-post-composer">
+        <div class="feed-head"><div class="mem-avatar" id="community-composer-avatar" style="width:34px;height:34px;"></div><div><div class="feed-name">Compartilhe com a comunidade</div><div class="feed-time">Publique uma conquista, dúvida ou foto no mural</div></div></div>
+        <div class="feed-input-row"><input type="text" maxlength="1000" placeholder="Escreva uma conquista ou comentário para todas as pacientes..." id="community-post-input" /><label class="feed-image-button" for="community-post-image">📷 Foto</label><input type="file" accept="image/jpeg,image/png,image/webp" id="community-post-image" style="display:none;" /><button type="button" id="community-post-publish">Publicar</button></div>
+      </div>
+      <div id="community-new-posts"></div>
       <div id="community-posts">
         <div class="feed-post" data-post-id="1">
           <div class="feed-head"><div class="mem-avatar feed-author-avatar" style="width:34px;height:34px;"></div><div><div class="feed-name">Marta</div><div class="feed-time">há 2 horas</div></div></div>
@@ -370,11 +344,6 @@
     <div id="tab-materiais" style="display:none;">
       <h1 class="mem-hello" style="font-size:28px;">Receitas &amp; Materiais</h1>
       <p class="mem-sub">Receituário funcional, planners e guias que preparei para você.</p>
-      <div class="identify-grid">
-        <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Planner alimentar semanal</div><p class="card-text">Organize suas refeições com praticidade.</p></div>
-        <div class="glass-card"><span class="card-num">PDF</span><div class="card-title">Guia de organização alimentar</div><p class="card-text">Passo a passo para simplificar o dia a dia.</p></div>
-      </div>
-
       <h3 style="margin-top:40px;margin-bottom:16px;">Receituário funcional</h3>
       <p class="card-text" style="margin-bottom:16px;">Salve as receitas que você quer guardar — elas contam pontos e aparecem no seu resumo.</p>
       <div class="identify-grid" id="receitas-grid">
@@ -407,10 +376,16 @@
       <h1 class="mem-hello" style="font-size:28px;">Meu Plano</h1>
       <p class="mem-sub">Seu plano alimentar personalizado, atualizado conforme sua evolução.</p>
       <div class="mem-panel">
-        <p class="card-text" id="plano-texto">Vou liberar seu plano atualizado logo após o seu próximo retorno em <strong>28 de julho</strong>. Enquanto isso, siga as orientações da última consulta.</p>
+        <p class="card-text" id="plano-texto">A Regiane ainda nao publicou seu plano alimentar.</p>
         <div id="plano-pdf-wrap" style="margin-top:18px;display:none;">
           <a id="plano-pdf-link" href="#" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Baixar plano em PDF &nbsp;→</a>
         </div>
+      </div>
+
+      <div class="mem-panel" style="margin-top:20px;">
+        <h3>Receitas que salvei</h3>
+        <p class="card-text" style="margin:6px 0 12px;">Aqui ficam as receitas que voce guardou na plataforma.</p>
+        <div id="saved-recipes-list"><p class="card-text" style="color:var(--muted);">Voce ainda nao salvou receitas.</p></div>
       </div>
     </div>
 
@@ -419,8 +394,7 @@
       <h1 class="mem-hello" style="font-size:28px;">Calendário</h1>
       <p class="mem-sub">Seus próximos retornos e eventos da comunidade.</p>
       <div class="mem-panel">
-        <div class="mem-list-item"><div class="mli-icon">📅</div><div><div class="mli-title">Retorno de acompanhamento</div><div class="mli-sub" id="calendario-retorno-sub">28 de julho · 15h00</div></div></div>
-        <div class="mem-list-item"><div class="mli-icon">🎥</div><div><div class="mli-title">Live mensal</div><div class="mli-sub">Sexta · 20h00</div></div></div>
+        <div id="calendar-upcoming-list"><p class="card-text" style="color:var(--muted);">Nenhum retorno ou evento agendado.</p></div>
       </div>
 
       <h3 style="margin-top:34px;margin-bottom:16px;">Agendar novo retorno</h3>
@@ -471,6 +445,20 @@
           <button type="button" class="btn btn-primary btn-sm" id="mat-add-btn">Adicionar</button>
           <span id="mat-add-status" style="font-size:12.5px;color:var(--muted);"></span>
         </div>
+      </div>
+
+      <h3 style="margin-bottom:14px;">Agendar uma live para as pacientes</h3>
+      <div class="mem-panel" style="margin-bottom:36px;">
+        <p class="card-text" style="margin-bottom:14px;">A live aparece na página inicial e na central de notificações das pacientes do Programa.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <input id="live-title" type="text" maxlength="120" placeholder="Título da live" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="live-date" type="date" aria-label="Data da live" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="live-time" type="time" aria-label="Horário da live" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+          <input id="live-link" type="url" placeholder="Link da sala (opcional)" style="padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;" />
+        </div>
+        <textarea id="live-description" maxlength="500" placeholder="Orientação para as pacientes (opcional)" style="width:100%;min-height:64px;margin-top:10px;padding:10px;border-radius:10px;border:1px solid var(--rose-mist);font-family:inherit;"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn btn-primary btn-sm" id="live-save">Agendar live</button><span id="live-status" style="font-size:12.5px;color:var(--muted);"></span></div>
+        <div id="admin-live-list" style="margin-top:16px;"></div>
       </div>
 
       <h3 style="margin-bottom:14px;">Rotinas e lembretes individuais</h3>
@@ -548,6 +536,10 @@
   const patientIdToken = sessionStorage.getItem('rs_programa_idtoken');
   const isAdminUser = sessionStorage.getItem('rs_programa_admin') === '1';
   let pendingAppointmentStatusRefresh = false;
+  let homeAppointment = null;
+  let homeLatestLesson = null;
+  let homeNextLive = null;
+  let currentSavedRecipes = [];
   const impersonateEmail = urlParams.get('as');
   const isImpersonating = !!(impersonateEmail && isAdminUser);
   const patientEmail = isImpersonating ? impersonateEmail : loggedInEmail;
@@ -596,7 +588,7 @@
       const saved=await apiPost('savePatientAvatar',{idToken:patientIdToken,email:patientEmail,fileBase64:image.base64,mimeType:image.type,fileName:file.name});
       if(!saved.ok) throw new Error(saved.error || 'Não foi possível salvar a foto.');
       setAvatar(document.getElementById('patient-avatar'),saved.avatarDataUrl);
-      document.querySelectorAll('.feed-author-avatar').forEach(el=>setAvatar(el,saved.avatarDataUrl));
+      setAvatar(document.getElementById('community-composer-avatar'),saved.avatarDataUrl);
     }catch(err){ alert(err.message || 'Não foi possível salvar a foto.'); }
     e.target.value='';
   });
@@ -640,14 +632,31 @@
     document.querySelectorAll('.mem-nav a').forEach(a=>a.classList.remove('active'));
     const tab = document.getElementById('tab-'+name);
     if(tab){ tab.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
-    if(typeof event !== 'undefined' && event.currentTarget) event.currentTarget.classList.add('active');
+    if(typeof event !== 'undefined' && event.currentTarget && event.currentTarget.matches && event.currentTarget.matches('.mem-nav a')) event.currentTarget.classList.add('active');
     if(window.__rebindCursor) window.__rebindCursor();
     if(name==='comunidade') loadComments();
     if(name==='pontos') loadPatientPhotos();
     if(name==='calendario') loadSlots();
     if(name==='notificacoes') loadRoutineData();
-    if(name==='admin'){ loadAdminBookings(); loadAdminPatients(); }
+    if(name==='admin'){ loadAdminBookings(); loadAdminPatients(); loadAdminCommunityLives(); }
   }
+  const appointmentModal=document.getElementById('appointment-detail-modal');
+  function openAppointmentDetail(){
+    if(!homeAppointment)return;
+    document.getElementById('appointment-detail-date').textContent=homeAppointment.data+' · '+(homeAppointment.hora||'horario a confirmar')+' · '+(homeAppointment.status==='solicitado'?'Aguardando confirmacao da Regiane':'Confirmado');
+    appointmentModal.style.display='flex';
+  }
+  document.getElementById('home-appointment-step').addEventListener('click',openAppointmentDetail);
+  document.getElementById('home-appointment-step').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAppointmentDetail();}});
+  document.getElementById('appointment-confirm-ok').addEventListener('click',()=>appointmentModal.style.display='none');
+  document.getElementById('appointment-reschedule').addEventListener('click',()=>{appointmentModal.style.display='none';showTab('calendario');});
+  appointmentModal.addEventListener('click',e=>{if(e.target===appointmentModal)appointmentModal.style.display='none';});
+  document.getElementById('home-latest-lesson').addEventListener('click',()=>{
+    if(homeLatestLesson){showTab('aulas');openVideoModal(homeLatestLesson.link,homeLatestLesson.titulo);}
+  });
+  document.getElementById('home-next-live').addEventListener('click',()=>{
+    if(!homeNextLive)return;if(homeNextLive.link)window.open(homeNextLive.link,'_blank','noopener');else showTab('comunidade');
+  });
   document.querySelectorAll('.video-filter').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       document.querySelectorAll('.video-filter').forEach(b=>b.classList.remove('active'));
@@ -656,6 +665,23 @@
   });
 
   /* ── DASHBOARD: dados reais da paciente ── */
+  function renderSavedRecipes(recipes){
+    const wrap=document.getElementById('saved-recipes-list');wrap.innerHTML='';
+    if(!recipes||!recipes.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Voce ainda nao salvou receitas.</p>';return;}
+    recipes.forEach(recipe=>{const item=document.createElement('div');item.className='mem-list-item';item.style.borderBottom='1px solid var(--hairline-soft)';
+      const icon=document.createElement('div');icon.className='mli-icon';icon.textContent='♡';const body=document.createElement('div');
+      const title=document.createElement('div');title.className='mli-title';title.textContent=recipe.titulo||recipe.id;
+      const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=(recipe.categoria||'Receita')+(recipe.descricao?' · '+recipe.descricao:'');body.append(title,detail);item.append(icon,body);wrap.appendChild(item);});
+  }
+  function renderHomeActivities(activities){
+    const wrap=document.getElementById('home-community-activity');wrap.innerHTML='';
+    if(!activities||!activities.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Nenhuma atividade recente.</p>';return;}
+    activities.forEach(activity=>{const row=document.createElement('div');row.className='mem-list-item';row.style.cssText='border:none;padding:10px 0;';
+      const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;flex-shrink:0;';setAvatar(avatar,activity.avatarDataUrl);
+      const body=document.createElement('div');const title=document.createElement('div');title.className='mli-title';title.textContent=activity.titulo||'Atividade recente';
+      const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=activity.detalhe||'';body.append(title,detail);row.append(avatar,body);
+      row.style.cursor='pointer';row.addEventListener('click',()=>{if(activity.tipo==='comunidade')showTab('comunidade');else if(activity.tipo==='live'){if(activity.link)window.open(activity.link,'_blank','noopener');else showTab('comunidade');}else{showTab('materiais');if(activity.link)window.open(activity.link,'_blank','noopener');}});wrap.appendChild(row);});
+  }
   async function loadDashboardData(){
     if(!apiConfigured() || !patientEmail || !patientIdToken) return;
     const d = await apiPost('patientDashboard', { idToken: patientIdToken, email: patientEmail });
@@ -671,7 +697,7 @@
     if(d.nome) document.getElementById('hello-title').textContent = 'Olá, ' + d.nome.split(' ')[0] + ' 🌿';
     if(d.avatarDataUrl){
       setAvatar(document.getElementById('patient-avatar'),d.avatarDataUrl);
-      document.querySelectorAll('.feed-author-avatar').forEach(el=>setAvatar(el,d.avatarDataUrl));
+      setAvatar(document.getElementById('community-composer-avatar'),d.avatarDataUrl);
     }
     document.getElementById('stat-dias').textContent = d.diasAcompanhamento;
     document.getElementById('stat-retornos').textContent = d.retornosRealizados;
@@ -679,31 +705,32 @@
     document.getElementById('stat-progresso').textContent = d.progressoPercent + '%';
     document.getElementById('progresso-bar').style.width = d.progressoPercent + '%';
 
-    if(d.proximoRetornoData){
-      const sub = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '') + ' · Online';
-      document.getElementById('proximo-retorno-sub').textContent = sub;
-      document.getElementById('calendario-retorno-sub').textContent = d.proximoRetornoData + (d.proximoRetornoHora ? ' · ' + d.proximoRetornoHora : '');
-    }
-
-    if(d.agendamentoStatus){
-      const tag = document.getElementById('proximo-retorno-tag');
-      const sub = document.getElementById('proximo-retorno-sub');
-      sub.textContent = d.agendamentoData + ' · ' + d.agendamentoHora + ' · Online';
-      tag.style.display = 'inline-flex';
-      if(d.agendamentoStatus === 'solicitado'){
-        tag.textContent = 'Aguardando confirmação';
-        tag.style.background = '#FFF3CD';
-        tag.style.color = '#7A5B00';
-      } else if(d.agendamentoStatus === 'confirmado'){
-        tag.textContent = 'Confirmado';
-        tag.style.background = 'var(--rose-mist)';
-        tag.style.color = 'var(--marsala-deep)';
-      } else {
-        tag.style.display = 'none';
-      }
-    } else {
-      document.getElementById('proximo-retorno-tag').style.display = 'none';
-    }
+    const appointmentDate=d.agendamentoData||d.proximoRetornoData||'';
+    const appointmentTime=d.agendamentoHora||d.proximoRetornoHora||'';
+    const appointmentStatus=d.agendamentoStatus||'confirmado';
+    const appointmentStep=document.getElementById('home-appointment-step');
+    homeAppointment=appointmentDate?{data:appointmentDate,hora:appointmentTime,status:appointmentStatus}:null;
+    appointmentStep.style.display=homeAppointment?'flex':'none';
+    if(homeAppointment){
+      document.getElementById('proximo-retorno-sub').textContent=appointmentDate+(appointmentTime?' ? '+appointmentTime:'');
+      const appointmentTag=document.getElementById('proximo-retorno-tag');appointmentTag.style.display='inline-flex';
+      appointmentTag.textContent=appointmentStatus==='solicitado'?'Pendente':'Confirmado';
+      document.getElementById('proximo-retorno-title').textContent=appointmentStatus==='solicitado'?'Solicitacao de retorno':'Retorno de acompanhamento';
+      document.getElementById('patient-next-appointment').style.display='block';
+    }else{document.getElementById('proximo-retorno-tag').style.display='none';document.getElementById('patient-next-appointment').style.display='none';}
+    homeLatestLesson=d.ultimaAula||(typeof VIDEOS_REGIANE!=='undefined'&&VIDEOS_REGIANE.length?VIDEOS_REGIANE[VIDEOS_REGIANE.length-1]:null);
+    const lessonStep=document.getElementById('home-latest-lesson');lessonStep.style.display=homeLatestLesson?'flex':'none';
+    if(homeLatestLesson)document.getElementById('home-latest-lesson-title').textContent='Nova aula: '+(homeLatestLesson.titulo||'Aula da Regiane');
+    homeNextLive=Array.isArray(d.proximasLives)&&d.proximasLives.length?d.proximasLives[0]:null;
+    const liveStep=document.getElementById('home-next-live');liveStep.style.display=homeNextLive?'flex':'none';
+    if(homeNextLive){document.getElementById('home-next-live-title').textContent=homeNextLive.titulo;document.getElementById('home-next-live-sub').textContent=homeNextLive.data+' | '+homeNextLive.hora;}
+    currentSavedRecipes=Array.isArray(d.receitasSalvasLista)?d.receitasSalvasLista:[];renderSavedRecipes(currentSavedRecipes);
+    const savedRecipeIds=new Set(currentSavedRecipes.map(recipe=>recipe.id));
+    document.querySelectorAll('.recipe-save-btn').forEach(button=>{const card=button.closest('[data-recipe-id]');const saved=card&&savedRecipeIds.has(card.dataset.recipeId);button.disabled=!!saved;button.textContent=saved?'Salva':'Salvar receita';});
+    renderHomeActivities(d.atividadeRecente||[]);
+    const communityLives=document.getElementById('community-live-events');if(communityLives){communityLives.innerHTML='';(d.proximasLives||[]).forEach(live=>{const card=document.createElement('div');card.className='mem-panel';card.style.marginBottom='12px';const title=document.createElement('h3');title.textContent=live.titulo;const detail=document.createElement('p');detail.className='card-text';detail.textContent='Live agendada para '+live.data+' | '+live.hora+(live.descricao?' | '+live.descricao:'');card.append(title,detail);if(live.link){const link=document.createElement('a');link.className='btn btn-primary btn-sm';link.href=live.link;link.target='_blank';link.rel='noopener';link.textContent='Abrir live';card.append(link);}communityLives.appendChild(card);});}
+    const calendarList=document.getElementById('calendar-upcoming-list');
+    if(calendarList){calendarList.innerHTML='';const rows=[];if(homeAppointment)rows.push({title:appointmentStatus==='solicitado'?'Solicitacao de retorno':'Retorno de acompanhamento',detail:[appointmentDate,appointmentTime].filter(Boolean).join(' | ')});(d.proximasLives||[]).forEach(live=>rows.push({title:'Live: '+live.titulo,detail:[live.data,live.hora].filter(Boolean).join(' | ')}));if(!rows.length)calendarList.innerHTML='<p class="card-text" style="color:var(--muted);">Nenhum retorno ou evento agendado.</p>';rows.forEach(entry=>{const item=document.createElement('div');item.className='mem-list-item';const body=document.createElement('div');const title=document.createElement('div');title.className='mli-title';title.textContent=entry.title;const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=entry.detail;body.append(title,detail);item.append(body);calendarList.appendChild(item);});}
 
     document.getElementById('pontos-total').textContent = d.pontosTotal;
     document.getElementById('pontos-comentarios').textContent = d.totalInteracoes;
@@ -997,6 +1024,26 @@
     if(c.imageDataUrl){ const image=document.createElement('img'); image.className='feed-photo'; image.alt='Imagem compartilhada na comunidade'; image.src=c.imageDataUrl; el.appendChild(image); }
     wrap.appendChild(el);
   }
+  function communityTime(value){
+    const date=new Date(value);if(isNaN(date.getTime()))return 'Agora';
+    const minutes=Math.max(0,Math.floor((Date.now()-date.getTime())/60000));
+    if(minutes<1)return 'agora';if(minutes<60)return 'ha '+minutes+' min';
+    const hours=Math.floor(minutes/60);if(hours<24)return 'ha '+hours+' h';
+    const days=Math.floor(hours/24);return 'ha '+days+' dia'+(days===1?'':'s');
+  }
+  function appendCommunityPost(post,placeAtBottom){
+    const root=document.getElementById('community-new-posts'),id=String(post.id||''),safeId=id.replace(/[^a-zA-Z0-9_-]/g,'');
+    if(!safeId||document.getElementById('community-post-'+safeId))return null;
+    const card=document.createElement('article');card.className='feed-post api-community-post';card.id='community-post-'+safeId;
+    const head=document.createElement('div');head.className='feed-head';const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;';setAvatar(avatar,post.avatarDataUrl);
+    const identity=document.createElement('div'),name=document.createElement('div'),time=document.createElement('div');name.className='feed-name';name.textContent=post.nome||'Paciente';time.className='feed-time';time.textContent=communityTime(post.dataHora);identity.append(name,time);head.append(avatar,identity);card.appendChild(head);
+    if(post.texto){const text=document.createElement('p');text.className='feed-text';text.textContent=post.texto;card.appendChild(text);}
+    if(post.imageDataUrl){const image=document.createElement('img');image.className='feed-photo';image.alt='Imagem compartilhada na comunidade';image.src=post.imageDataUrl;card.appendChild(image);}
+    const comments=document.createElement('div');comments.className='feed-comments';comments.id='feed-comments-'+safeId;card.appendChild(comments);
+    const row=document.createElement('div');row.className='feed-input-row';const input=document.createElement('input');input.type='text';input.maxLength=1000;input.placeholder='Escreva um comentario ou uma duvida...';input.id='feed-input-'+safeId;
+    const label=document.createElement('label');label.className='feed-image-button';label.htmlFor='feed-image-'+safeId;label.textContent='📷 Foto';const file=document.createElement('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';file.id='feed-image-'+safeId;file.style.display='none';
+    const button=document.createElement('button');button.type='button';button.textContent='Publicar';button.addEventListener('click',()=>postComment(safeId));row.append(input,label,file,button);card.appendChild(row);if(placeAtBottom)root.appendChild(card);else root.prepend(card);return comments;
+  }
   async function loadComments(){
     if(!apiConfigured() || !patientIdToken) return;
     for(const id of [1,2]){
@@ -1005,6 +1052,16 @@
       const wrap = document.getElementById('feed-comments-'+id);
       wrap.querySelectorAll('.api-comment').forEach(el=>el.remove());
       res.comments.forEach(c=>appendCommunityComment(wrap,c));
+    }
+    const postsRes=await apiPost('patientComments',{idToken:patientIdToken,email:patientEmail,postId:'mural'});
+    if(postsRes.ok){
+      const root=document.getElementById('community-new-posts');root.querySelectorAll('.api-community-post').forEach(el=>el.remove());
+      const posts=postsRes.comments.filter(c=>c.tipo==='post').sort((a,b)=>new Date(b.dataHora)-new Date(a.dataHora));
+      for(const post of posts){
+        const wrap=appendCommunityPost(post,true);if(!wrap)continue;
+        const replies=await apiPost('patientComments',{idToken:patientIdToken,email:patientEmail,postId:post.id});
+        if(replies.ok)replies.comments.forEach(c=>appendCommunityComment(wrap,c));
+      }
     }
     if(window.__rebindCursor) window.__rebindCursor();
   }
@@ -1037,6 +1094,24 @@
   }
 
   /* ── CALENDÁRIO: horários reais via API ── */
+  document.getElementById('community-post-publish').addEventListener('click',async()=>{
+    const button=document.getElementById('community-post-publish'),input=document.getElementById('community-post-input');
+    const fileInput=document.getElementById('community-post-image'),file=fileInput.files&&fileInput.files[0],text=input.value.trim();
+    if(!text&&!file)return;
+    if(isImpersonating){alert('No modo "Ver como paciente", a administradora pode visualizar, mas nao publicar em nome da paciente.');return;}
+    if(!apiConfigured()||!patientEmail||!patientIdToken){alert('Faca login novamente para publicar.');return;}
+    button.disabled=true;let image={};
+    try{
+      if(file){const prepared=await prepareCommunityImage(file);image={fileBase64:prepared.base64,mimeType:prepared.type,fileName:file.name};}
+      const result=await apiPost('communityPost',{idToken:patientIdToken,email:patientEmail,texto:text,...image});
+      if(!result.ok)throw new Error(result.error||'Nao foi possivel publicar.');
+      appendCommunityPost({id:result.id,nome:result.nome,texto:text,dataHora:result.dataHora,imageDataUrl:result.imageDataUrl,avatarDataUrl:result.avatarDataUrl});
+      input.value='';fileInput.value='';if(result.pontosAdicionados)loadDashboardData();
+      if(window.__rebindCursor)window.__rebindCursor();
+    }catch(err){alert(err.message||'Nao foi possivel publicar.');}
+    finally{button.disabled=false;}
+  });
+
   async function loadSlots(){
     const wrap = document.getElementById('calendario-slots');
     if(!apiConfigured()){
@@ -1079,12 +1154,21 @@
       const recipeId = card.dataset.recipeId;
       const recipeTitle = card.querySelector('.card-title').textContent;
       if(!patientEmail){ alert('Faça login novamente.'); return; }
-      if(!apiConfigured()){ btn.textContent = 'Salva ✓'; btn.disabled = true; return; }
+      if(!apiConfigured()){ alert('A conexao com a plataforma nao esta disponivel. Tente novamente.'); return; }
       btn.disabled = true;
       btn.textContent = 'Salvando...';
       if(isImpersonating){ alert('No modo “Ver como paciente”, receitas não são salvas em nome dela.'); btn.disabled = false; btn.textContent = 'Salvar receita'; return; }
       const res = await apiPost('saveRecipe', { idToken: patientIdToken, email: patientEmail, recipeId: recipeId, recipeTitle: recipeTitle });
       if(res.ok){
+        btn.textContent = 'Salvando...';
+        btn.disabled = true;
+        document.getElementById('stat-receitas').textContent = res.receitasSalvas;
+        if(!currentSavedRecipes.some(recipe=>recipe.id===recipeId)){
+          const categories={ 'bowl-anti-inflamatorio':'Salgado','overnight-oats-canela':'Doce','sopa-detox-gengibre':'Salgado' };
+          currentSavedRecipes.push({id:recipeId,titulo:recipeTitle,categoria:categories[recipeId]||'Receita',descricao:card.querySelector('.card-text').textContent||''});
+          renderSavedRecipes(currentSavedRecipes);
+        }
+
         btn.textContent = 'Salva ✓';
         document.getElementById('stat-receitas').textContent = res.receitasSalvas;
       } else {
@@ -1422,6 +1506,20 @@
     });
   }
 
+  async function loadAdminCommunityLives(){
+    const wrap=document.getElementById('admin-live-list');if(!wrap)return;
+    const res=await apiPost('adminListCommunityLives',{idToken:patientIdToken});
+    if(!res.ok){wrap.textContent=res.error||'Nao foi possivel carregar as lives.';return;}
+    wrap.innerHTML='';
+    if(!res.lives.length){wrap.innerHTML='<p class="card-text" style="color:var(--muted);">Nenhuma live futura agendada.</p>';return;}
+    res.lives.forEach(live=>{
+      const row=document.createElement('div');row.className='mem-list-item';row.style.cssText='justify-content:space-between;gap:10px;';
+      const text=document.createElement('div');const title=document.createElement('div');title.className='mli-title';title.textContent=live.titulo;
+      const detail=document.createElement('div');detail.className='mli-sub';detail.textContent=live.data+' · '+live.hora+(live.link?' · link incluido':'');text.append(title,detail);row.appendChild(text);
+      const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-outline btn-sm';cancel.textContent='Cancelar';cancel.addEventListener('click',async()=>{cancel.disabled=true;const result=await apiPost('adminCancelCommunityLive',{idToken:patientIdToken,id:live.id});if(result.ok)loadAdminCommunityLives();else{cancel.disabled=false;window.alert(result.error||'Nao foi possivel cancelar.');}});row.appendChild(cancel);wrap.appendChild(row);
+    });
+  }
+
   async function loadAdminRoutines(){
     const email = document.getElementById('routine-patient').value;
     const wrap = document.getElementById('admin-routines-list');
@@ -1479,6 +1577,19 @@
       }
     });
   }
+
+  document.getElementById('live-save').addEventListener('click',async()=>{
+    const btn=document.getElementById('live-save'),status=document.getElementById('live-status');
+    const titulo=document.getElementById('live-title').value.trim(),data=document.getElementById('live-date').value,hora=document.getElementById('live-time').value;
+    if(!titulo||!data||!hora){status.textContent='Preencha titulo, data e horario.';return;}
+    btn.disabled=true;status.textContent='Agendando e notificando as pacientes...';
+    const res=await apiPost('adminSaveCommunityLive',{idToken:patientIdToken,titulo,data,hora,link:document.getElementById('live-link').value.trim(),descricao:document.getElementById('live-description').value.trim()});
+    btn.disabled=false;
+    if(!res.ok){status.textContent=res.error||'Nao foi possivel agendar a live.';return;}
+    status.textContent='Live agendada e adicionada as notificacoes das pacientes.';
+    ['live-title','live-date','live-time','live-link','live-description'].forEach(id=>document.getElementById(id).value='');
+    loadAdminCommunityLives();
+  });
 
   const matAddBtn = document.getElementById('mat-add-btn');
   const matReleaseMode = document.getElementById('mat-release-mode');

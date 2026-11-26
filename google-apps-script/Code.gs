@@ -101,7 +101,7 @@ function ensureGamificationSheets_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let comentarios = ss.getSheetByName('Comentarios');
   if (!comentarios) comentarios = ss.insertSheet('Comentarios');
-  ensureHeaders_(comentarios, ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos', 'ImageDriveFileId', 'ImageMimeType']);
+  ensureHeaders_(comentarios, ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos', 'ImageDriveFileId', 'ImageMimeType', 'Tipo', 'ParentId']);
 
   let pontos = ss.getSheetByName('PontosLog');
   if (!pontos) pontos = ss.insertSheet('PontosLog');
@@ -221,6 +221,10 @@ function doPost(e) {
     if (action === 'patientTrackMaterial') return jsonResponse(actionPatientTrackMaterial(body));
     if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
+    if (action === 'communityPost') return jsonResponse(actionAddComment(Object.assign({}, body, { postId: 'mural', tipo: 'post' })));
+    if (action === 'adminListCommunityLives') return jsonResponse(actionAdminListCommunityLives(body));
+    if (action === 'adminSaveCommunityLive') return jsonResponse(actionAdminSaveCommunityLive(body));
+    if (action === 'adminCancelCommunityLive') return jsonResponse(actionAdminCancelCommunityLive(body));
     if (action === 'savePatientAvatar') return jsonResponse(actionSavePatientAvatar(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
     if (action === 'checkAccess') return jsonResponse(actionCheckAccess(body));
@@ -379,6 +383,27 @@ function daysSince(dateVal) {
   return Math.max(0, Math.floor((now - start) / (1000 * 60 * 60 * 24)));
 }
 
+function patientHomeActivities_(email, enrollmentDate, upcomingLives) {
+  const activities = [];
+  const comments = sheetToObjects(ensureGamificationSheets_().comentarios).filter(function(c) {
+    return String(c.Texto || '').trim() || c.ImageDriveFileId;
+  }).sort(function(a,b) { return new Date(b.DataHora) - new Date(a.DataHora); });
+  comments.slice(0,1).forEach(function(c) {
+    const author = findPatientRow(c.Email);
+    activities.push({ tipo:'comunidade', titulo:(c.Nome || 'Paciente') + ' compartilhou na comunidade',
+      detalhe:String(c.Texto || 'Compartilhou uma foto.').slice(0,72), dataHora:c.DataHora || '', avatarDataUrl:patientAvatarData_(author) });
+  });
+  const materials = getAvailableMaterialsForPatient_('programa', email, enrollmentDate).filter(function(m) { return m.area === 'materiais'; });
+  const latestMaterial = materials.slice(-1)[0];
+  if (latestMaterial) activities.push({ tipo:'material', titulo:'Novo material: ' + latestMaterial.titulo,
+    detalhe:latestMaterial.categoria || latestMaterial.tipo || 'Material', dataHora:latestMaterial.createdAt || '', link:latestMaterial.link || '' });
+  (upcomingLives || []).slice(0,1).forEach(function(live) {
+    activities.push({ tipo:'live', titulo:'Live agendada: ' + live.titulo, detalhe:live.data + ' · ' + live.hora,
+      dataHora:live.criadoEm || '', link:live.link || '' });
+  });
+  return activities;
+}
+
 function actionDashboard(email) {
   ensurePatientInstagramHeader_();
   let p = findPatientRow(email);
@@ -391,6 +416,13 @@ function actionDashboard(email) {
   const avatar = patientAvatarData_(p);
 
   const materiais = getAvailableMaterialsForPatient_('programa', email, p.DataInicio);
+  const savedRecipeIds = String(p.ReceitasSalvasIds || '').split(',').map(function(id) { return id.trim(); }).filter(Boolean);
+  const savedRecipes = savedRecipeIds.map(function(id) {
+    const recipe = recipeAnalytics_(id, id);
+    return { id:id, titulo:recipe.titulo, categoria:recipe.categoria, descricao:recipe.descricao || '' };
+  });
+  const upcomingLives = communityLiveObjects_(true);
+  const homeActivities = patientHomeActivities_(email, p.DataInicio, upcomingLives);
 
   ensureGamificationSheets_();
   const pontosTotal = Number(p.PontosTotal) || 0;
@@ -421,6 +453,7 @@ function actionDashboard(email) {
     diasAcompanhamento: daysSince(p.DataInicio),
     retornosRealizados: Number(p.RetornosRealizados) || 0,
     receitasSalvas: Number(p.ReceitasSalvas) || 0,
+    receitasSalvasLista: savedRecipes,
     progressoPercent: Number(p.ProgressoPercent) || 0,
     proximoRetornoData: atendimentoFinanceiro ? Utilities.formatDate(new Date(atendimentoFinanceiro.date), NOTIFICATION_TIMEZONE, 'dd/MM/yyyy') : proximoAgendamento ? proximoAgendamento.Data : p.ProximoRetornoData || '',
     proximoRetornoHora: atendimentoFinanceiro ? Utilities.formatDate(new Date(atendimentoFinanceiro.date), NOTIFICATION_TIMEZONE, 'HH:mm') : proximoAgendamento ? proximoAgendamento.Hora : p.ProximoRetornoHora || '',
@@ -440,7 +473,10 @@ function actionDashboard(email) {
     creditoDisponivel: credito.disponivel,
     creditoHistorico: credito.historico,
     faltamParaProximoCredito: 100 - (pontosTotal % 100),
-    materiais: materiais
+    materiais: materiais,
+    ultimaAula: materiais.filter(function(m) { return m.area === 'aulas'; }).slice(-1)[0] || null,
+    proximasLives: upcomingLives.slice(0, 5),
+    atividadeRecente: homeActivities
   };
 }
 
@@ -476,7 +512,6 @@ function actionSaveRecipe(body) {
   const recipeId = String(body.recipeId || '').trim();
   if (!recipeId) return { ok: false, error: 'Receita inválida.' };
   ensureHeaders_(getSheet('Pacientes'), ['ReceitasSalvas', 'ReceitasSalvasIds', 'PontosTotal']);
-  migrateLegacyRecipeSaves_();
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -502,7 +537,6 @@ function actionSaveRecipe(body) {
       const patient = findPatientRow(email);
       const recipe = recipeAnalytics_(recipeId, body.recipeTitle);
       recordMaterialEngagement_(email, patient ? patient.Nome : email, recipeId, recipe.titulo, recipe.categoria, 'materiais', 'Receita salva', 'Botão Salvar receita', false);
-      refreshMaterialEngagementDashboard_();
       return { ok: true, jaSalva: false, receitasSalvas: novoTotal };
     }
   }
@@ -527,7 +561,14 @@ function recipeAnalytics_(recipeId, fallbackTitle) {
     'overnight-oats-canela': { titulo: 'Overnight oats de canela', categoria: 'Doce' },
     'sopa-detox-gengibre': { titulo: 'Sopa detox de gengibre', categoria: 'Salgado' }
   };
-  return recipes[recipeId] || { titulo: String(fallbackTitle || recipeId), categoria: 'Receita' };
+  const recipe = recipes[recipeId] || { titulo: String(fallbackTitle || recipeId), categoria: 'Receita' };
+  const descriptions = {
+    'bowl-anti-inflamatorio':'Quinoa, curcuma, vegetais assados e molho de tahine.',
+    'overnight-oats-canela':'Aveia, chia, canela e leite vegetal, pronto na geladeira de um dia para o outro.',
+    'sopa-detox-gengibre':'Abobora, gengibre e curcuma, otima para dias de intestino preso.'
+  };
+  recipe.descricao = descriptions[recipeId] || '';
+  return recipe;
 }
 
 function recordMaterialEngagement_(email, name, materialId, title, category, area, action, source, countRepeat) {
@@ -668,7 +709,6 @@ function actionPatientTrackMaterial(body) {
   if (!isAdmin(viewerEmail) || viewerEmail === email) {
     recordMaterialEngagement_(email, (findPatientRow(email) || findConsultoriaRow(email) || {}).Nome || email,
       materialId, material.Titulo || 'Material da Regiane', material.Categoria || material.Tipo || 'Material', area, 'Material acessado', 'Link de material', true);
-    refreshMaterialEngagementDashboard_();
   }
   return { ok:true };
 }
@@ -1110,7 +1150,7 @@ function ensureMaterialHeaders_() {
     headers = ['Id', 'Email', 'Tipo', 'Titulo', 'Descricao', 'Link', 'Area'];
     sheet.appendRow(headers);
   }
-  ['DriveFileId', 'DiasLiberacao', 'DataDisponibilizacao', 'Categoria'].forEach(function(name) {
+  ['DriveFileId', 'DiasLiberacao', 'DataDisponibilizacao', 'Categoria', 'DataCadastro'].forEach(function(name) {
     if (headers.indexOf(name) === -1) {
       sheet.getRange(1, headers.length + 1).setValue(name);
       headers.push(name);
@@ -1161,6 +1201,7 @@ function getAvailableMaterialsForPatient_(area, email, enrollmentDate, bypassRel
   }).map(function(material) {
     return {
       id: String(material.Id || ''), tipo: material.Tipo || 'Material', categoria: material.Categoria || material.Tipo || 'Material',
+      createdAt:material.DataCadastro || '',
       titulo: material.Titulo || 'Material da Regiane', descricao: material.Descricao || '',
       link: material.DriveFileId ? '' : material.Link, file: !!material.DriveFileId,
       area: material.Area || 'materiais'
@@ -1205,7 +1246,6 @@ function actionPatientMaterialFile(body) {
     const patient = findPatientRow(email) || findConsultoriaRow(email) || {};
     recordMaterialEngagement_(email, patient.Nome || email, materialId, material.Titulo || 'Material da Regiane', material.Categoria || material.Tipo || 'PDF', area,
       'Material acessado', 'Download de PDF', true);
-    refreshMaterialEngagementDashboard_();
   }
   return {
     ok: true, fileName: blob.getName() || material.Titulo || 'material.pdf',
@@ -1264,7 +1304,7 @@ function actionAdminAddMaterial(body) {
     Id: Utilities.getUuid(), Email: destino === 'todos' || destino === 'consultoria' ? destino.toUpperCase() : destino,
     Tipo: body.tipo || tipoPadrao, Categoria: String(body.categoria || body.tipo || tipoPadrao).trim(), Titulo: titulo, Descricao: body.descricao || '', Link: link,
     Area: area, DriveFileId: fileId, DiasLiberacao: releaseDate ? 0 : releaseDays,
-    DataDisponibilizacao: releaseDate
+    DataDisponibilizacao: releaseDate, DataCadastro:new Date()
   };
   sheet.appendRow(headers.map(function(header) { return values[header] !== undefined ? values[header] : ''; }));
 
@@ -1274,6 +1314,102 @@ function actionAdminAddMaterial(body) {
 // ── ROTINAS E NOTIFICAÇÕES INDIVIDUAIS ──────────────────
 
 const NOTIFICATION_TIMEZONE = 'America/Sao_Paulo';
+
+function ensureCommunityLivesSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName('LivesComunidade');
+  if (!sheet) sheet = ss.insertSheet('LivesComunidade');
+  ensureHeaders_(sheet, ['Id', 'Titulo', 'Descricao', 'Data', 'Hora', 'Link', 'Ativo', 'CriadoEm', 'AtualizadoEm']);
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function liveDateString_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) return Utilities.formatDate(value, NOTIFICATION_TIMEZONE, 'yyyy-MM-dd');
+  const text = String(value || '').trim();
+  const iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return iso ? iso[1] : '';
+}
+
+function communityLiveObjects_(futureOnly) {
+  const today = Utilities.formatDate(new Date(), NOTIFICATION_TIMEZONE, 'yyyyMMdd');
+  return sheetToObjects(ensureCommunityLivesSheet_()).filter(function(live) {
+    if (String(live.Ativo).trim().toLowerCase() !== 'sim') return false;
+    const dateKey = notificationDateKey_(live.Data);
+    return !futureOnly || (dateKey && dateKey >= today);
+  }).map(function(live) {
+    return { id:String(live.Id), titulo:String(live.Titulo || ''), descricao:String(live.Descricao || ''),
+      data:liveDateString_(live.Data), hora:String(live.Hora || ''), link:String(live.Link || ''), criadoEm:live.CriadoEm || '' };
+  }).sort(function(a,b) { return (a.data + ' ' + a.hora).localeCompare(b.data + ' ' + b.hora); });
+}
+
+function actionAdminListCommunityLives(body) {
+  assertAdmin(body.idToken);
+  return { ok:true, lives:communityLiveObjects_(false) };
+}
+
+function saveLiveNotifications_(live, cancelled) {
+  const sheet = ensureNotificationSheets_().notificacoes;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const idCol = headers.indexOf('Id');
+  const title = cancelled ? 'Live cancelada: ' + live.Titulo : 'Nova live: ' + live.Titulo;
+  const message = cancelled ? 'A live de ' + live.Data + ' às ' + live.Hora + ' foi cancelada pela Regiane.' :
+    'A Regiane agendou uma live para ' + live.Data + ' às ' + live.Hora + '.' + (live.Descricao ? ' ' + live.Descricao : '') + (live.Link ? ' Link: ' + live.Link : '');
+  const patientEmails = Array.from(new Set(sheetToObjects(getSheet('Pacientes')).map(function(p) { return normEmail(p.Email); }).filter(Boolean)));
+  patientEmails.forEach(function(email) {
+    const id = 'live-' + live.Id + '-' + email;
+    let row = -1;
+    for (let i=1;i<data.length;i++) if (String(data[i][idCol]) === id) { row=i+1; break; }
+    const values = { Id:id, RotinaId:'live:' + live.Id, Email:email, Titulo:title, Mensagem:message,
+      AgendadaPara:new Date(live.Data + 'T' + live.Hora + ':00-03:00'), EnviadaEm:'', LidaEm:'', ConcluidaEm:'', Status:cancelled ? 'Cancelada' : 'Nova' };
+    if (row > 0) headers.forEach(function(h,i) { if (values[h] !== undefined) sheet.getRange(row,i+1).setValue(values[h]); });
+    else sheet.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; }));
+  });
+}
+
+function actionAdminSaveCommunityLive(body) {
+  assertAdmin(body.idToken);
+  const titulo = String(body.titulo || '').trim();
+  const data = String(body.data || '').trim();
+  const hora = normalizeTimes_(body.hora).split(',')[0] || '';
+  const descricao = String(body.descricao || '').trim();
+  const link = String(body.link || '').trim();
+  if (!titulo || titulo.length > 120) return { ok:false, error:'Informe um título de até 120 caracteres.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !notificationDateKey_(data)) return { ok:false, error:'Escolha uma data válida.' };
+  if (!hora || !/^\d{2}:\d{2}$/.test(hora)) return { ok:false, error:'Informe um horário válido.' };
+  if (link && !isValidPublicLink_(link)) return { ok:false, error:'O link precisa começar com https://.' };
+  const eventAt = new Date(data + 'T' + hora + ':00-03:00');
+  if (isNaN(eventAt.getTime()) || eventAt <= new Date()) return { ok:false, error:'A data e o horário precisam ser futuros.' };
+  const sheet = ensureCommunityLivesSheet_();
+  const valuesNow = sheet.getDataRange().getValues();
+  const headers = valuesNow[0].map(String);
+  const id = String(body.id || Utilities.getUuid());
+  const now = new Date();
+  const values = { Id:id, Titulo:titulo, Descricao:descricao, Data:data, Hora:hora, Link:link, Ativo:'Sim', AtualizadoEm:now };
+  let row = -1;
+  for (let i=1;i<valuesNow.length;i++) if (String(valuesNow[i][headers.indexOf('Id')]) === id) { row=i+1; break; }
+  if (row > 0) headers.forEach(function(h,i) { if (values[h] !== undefined) sheet.getRange(row,i+1).setValue(values[h]); });
+  else { values.CriadoEm=now; sheet.appendRow(headers.map(function(h) { return values[h] !== undefined ? values[h] : ''; })); }
+  const live = { Id:id, Titulo:titulo, Descricao:descricao, Data:data, Hora:hora, Link:link };
+  saveLiveNotifications_(live, false);
+  return { ok:true, id:id };
+}
+
+function actionAdminCancelCommunityLive(body) {
+  assertAdmin(body.idToken);
+  const id = String(body.id || '');
+  const sheet = ensureCommunityLivesSheet_();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const row = data.findIndex(function(values,i) { return i > 0 && String(values[headers.indexOf('Id')]) === id; });
+  if (row < 0) return { ok:false, error:'Live não encontrada.' };
+  const live = {};
+  headers.forEach(function(h,i) { live[h]=data[row][i]; });
+  sheet.getRange(row+1,headers.indexOf('Ativo')+1).setValue('Não');
+  saveLiveNotifications_(live, true);
+  return { ok:true };
+}
 
 function ensureNotificationSheets_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -1456,7 +1592,7 @@ function actionPatientRoutineData(body) {
   });
   return { ok: true, email: email, nome: paciente ? paciente.Nome || '' : '', rotinas: routines, rotinasFuturas:futureRoutines, notificacoes: notifications,
     notificacoesPaciente: directNotifications, proximasConsultas: proximasConsultas, proximaConsulta: next,
-    naoLidas: notifications.concat(directNotifications).filter(function(n) { return !n.lida; }).length };
+    naoLidas: Array.from(new Map(notifications.concat(directNotifications).map(function(n) { return [n.id, n]; })).values()).filter(function(n) { return !n.lida; }).length };
 }
 
 function actionPatientCompleteRoutine(body) {
@@ -1618,7 +1754,7 @@ function actionComments(body) {
   return {
     ok: true,
     comments: filtered.map(c => ({ id: String(c.Id), nome: c.Nome, texto: c.Texto, dataHora: c.DataHora,
-      imageDataUrl: communityFileData_(c.ImageDriveFileId, c.ImageMimeType), avatarDataUrl: patientAvatarData_(findPatientRow(c.Email)) }))
+      tipo: String(c.Tipo || 'comentario'), parentId: String(c.ParentId || ''), imageDataUrl: communityFileData_(c.ImageDriveFileId, c.ImageMimeType), avatarDataUrl: patientAvatarData_(findPatientRow(c.Email)) }))
   };
 }
 
@@ -1675,6 +1811,9 @@ function actionAddComment(body) {
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
   const texto = String(body.texto || '').trim();
   const hasImage = !!body.fileBase64;
+  const tipo = String(body.tipo || 'comentario') === 'post' ? 'post' : 'comentario';
+  const postId = tipo === 'post' ? 'mural' : String(body.postId || '').trim();
+  if (!postId) return { ok: false, error: 'Escolha a publicacao para comentar.' };
   if (!texto && !hasImage) return { ok: false, error: 'Escreva um comentário ou escolha uma imagem.' };
   if (texto.length > 1000) return { ok: false, error: 'O comentário deve ter no máximo 1.000 caracteres.' };
   const storedImage = hasImage ? storeCommunityImage_(body.fileBase64, body.mimeType, body.fileName || 'comunidade') : null;
@@ -1689,7 +1828,7 @@ function actionAddComment(body) {
     const anteriores = sheetToObjects(sheets.comentarios).filter(function(c) { return normEmail(c.Email) === email; });
     const duplicadoRecente = anteriores.some(function(c) {
       const quando = new Date(c.DataHora);
-      return String(c.PostId) === String(body.postId) && String(c.Texto || '').trim().toLowerCase() === texto.toLowerCase() &&
+      return String(c.PostId) === postId && String(c.Texto || '').trim().toLowerCase() === texto.toLowerCase() &&
         !isNaN(quando.getTime()) && (new Date().getTime() - quando.getTime()) < 24 * 60 * 60 * 1000;
     });
     const comentariosHoje = anteriores.filter(function(c) { return sameLocalDay_(c.DataHora, new Date()) && Number(c.PontosConcedidos) > 0; }).length;
@@ -1697,7 +1836,11 @@ function actionAddComment(body) {
     id = 'comentario-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
     const pontosInteracao = hasImage && !texto ? 5 : 3;
     pontosConcedidos = (!duplicadoRecente && comentariosHoje < 10) ? pontosInteracao : 0;
-    sheets.comentarios.appendRow([id, body.postId, email, p.Nome, texto, new Date(), '', 'Pendente', pontosConcedidos, storedImage ? storedImage.id : '', storedImage ? storedImage.mimeType : '']);
+    const values = { Id:id, PostId:postId, Email:email, Nome:p.Nome, Texto:texto, DataHora:new Date(), AvisoEnviadoEm:'', StatusAviso:'Pendente',
+      PontosConcedidos:pontosConcedidos, ImageDriveFileId:storedImage ? storedImage.id : '', ImageMimeType:storedImage ? storedImage.mimeType : '',
+      Tipo:tipo, ParentId:tipo === 'post' ? '' : postId };
+    const headers = sheets.comentarios.getRange(1, 1, 1, sheets.comentarios.getLastColumn()).getValues()[0].map(String);
+    sheets.comentarios.appendRow(headers.map(function(header) { return values[header] !== undefined ? values[header] : ''; }));
     row = sheets.comentarios.getLastRow();
     if (pontosConcedidos) addPointsUnlocked_(email, hasImage && !texto ? 'Foto do prato na comunidade' : 'Comentário na comunidade', pontosConcedidos, id);
   } finally {
@@ -1713,7 +1856,8 @@ function actionAddComment(body) {
   comentarios.getRange(row, 8).setValue(enviado ? 'Enviado' : 'Erro no envio');
 
   return { ok: true, id: id, nome: p.Nome, pontosAdicionados: pontosConcedidos, avisoRegianeEnviado: enviado,
-    imageDataUrl: storedImage ? communityFileData_(storedImage.id, storedImage.mimeType) : '', avatarDataUrl: patientAvatarData_(findPatientRow(email)) };
+    imageDataUrl: storedImage ? communityFileData_(storedImage.id, storedImage.mimeType) : '', avatarDataUrl: patientAvatarData_(findPatientRow(email)),
+    tipo:tipo, dataHora:new Date() };
 }
 
 function addPointsUnlocked_(email, tipo, pontos, chaveUnica) {
