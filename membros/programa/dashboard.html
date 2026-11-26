@@ -76,7 +76,8 @@
     </ul>
     <a href="../index.html" style="font-size:11.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;">← Trocar de área</a>
     <div class="mem-user">
-      <div class="mem-avatar"></div>
+      <div class="mem-avatar" id="patient-avatar" title="Alterar foto do perfil"></div>
+      <input type="file" id="patient-avatar-file" accept="image/jpeg,image/png,image/webp" style="display:none;" />
       <div>
         <div class="mem-user-name" id="mem-user-name">Paciente</div>
         <div class="mem-user-role" id="patient-service-label">Programa Reequilíbrio Funcional</div>
@@ -336,35 +337,16 @@
         </div>
       </div>
 
-      <h3 style="margin-top:40px;margin-bottom:16px;">Mural de conquistas</h3>
-
-      <div class="feed-post">
-        <div class="feed-head">
-          <div class="mem-avatar" style="width:34px;height:34px;"></div>
-          <div><div class="feed-name">Marta</div><div class="feed-time">há 2 horas</div></div>
+      <div id="community-posts">
+        <div class="feed-post" data-post-id="1">
+          <div class="feed-head"><div class="mem-avatar feed-author-avatar" style="width:34px;height:34px;"></div><div><div class="feed-name">Mural de conquistas</div><div class="feed-time">Compartilhe sua jornada com o grupo</div></div></div>
+          <div class="feed-comments" id="feed-comments-1"></div>
+          <div class="feed-input-row"><input type="text" maxlength="1000" placeholder="Escreva uma conquista ou comentário..." id="feed-input-1" /><label class="feed-image-button" for="feed-image-1">📷 Foto</label><input type="file" accept="image/jpeg,image/png,image/webp" id="feed-image-1" style="display:none;" /><button type="button" onclick="postComment(1)">Publicar</button></div>
         </div>
-        <p class="feed-text">Semana 6 e finalmente meu intestino funcionando todo dia! 🌿</p>
-        <div class="feed-photo"></div>
-        <div class="feed-comments" id="feed-comments-1">
-          <div class="feed-comment"><div class="fc-avatar"></div><div><span class="fc-name">Regiane</span><span class="fc-text">Que orgulho, Marta! Continue assim 💗</span></div></div>
-        </div>
-        <div class="feed-input-row">
-          <input type="text" maxlength="1000" placeholder="Escreva um comentário ou uma dúvida..." id="feed-input-1" />
-          <button type="button" onclick="postComment(1)">Enviar</button>
-        </div>
-      </div>
-
-      <div class="feed-post">
-        <div class="feed-head">
-          <div class="mem-avatar" style="width:34px;height:34px;"></div>
-          <div><div class="feed-name">Juliana</div><div class="feed-time">há 1 dia</div></div>
-        </div>
-        <p class="feed-text">Bowl anti-inflamatório da receita que vocês compartilharam essa semana — ficou incrível!</p>
-        <div class="feed-photo"></div>
-        <div class="feed-comments" id="feed-comments-2"></div>
-        <div class="feed-input-row">
-          <input type="text" maxlength="1000" placeholder="Escreva um comentário ou uma dúvida..." id="feed-input-2" />
-          <button type="button" onclick="postComment(2)">Enviar</button>
+        <div class="feed-post" data-post-id="2">
+          <div class="feed-head"><div class="mem-avatar feed-author-avatar" style="width:34px;height:34px;"></div><div><div class="feed-name">Dúvidas e trocas</div><div class="feed-time">Converse com as outras pacientes</div></div></div>
+          <div class="feed-comments" id="feed-comments-2"></div>
+          <div class="feed-input-row"><input type="text" maxlength="1000" placeholder="Escreva uma dúvida ou comentário..." id="feed-input-2" /><label class="feed-image-button" for="feed-image-2">📷 Foto</label><input type="file" accept="image/jpeg,image/png,image/webp" id="feed-image-2" style="display:none;" /><button type="button" onclick="postComment(2)">Publicar</button></div>
         </div>
       </div>
 
@@ -580,6 +562,45 @@
     window.location.href = 'login.html';
   });
 
+  function setAvatar(el, src){
+    if(!el) return;
+    if(src){ el.style.backgroundImage = `url("${src}")`; el.classList.add('has-photo'); }
+    else { el.style.backgroundImage = ''; el.classList.remove('has-photo'); }
+  }
+  document.getElementById('patient-avatar').addEventListener('click', ()=>{
+    if(!isImpersonating) document.getElementById('patient-avatar-file').click();
+  });
+  document.getElementById('patient-avatar-file').addEventListener('change', async e=>{
+    const file=e.target.files && e.target.files[0]; if(!file) return;
+    try{
+      const image=await prepareCommunityImage(file);
+      const saved=await apiPost('savePatientAvatar',{idToken:patientIdToken,email:patientEmail,fileBase64:image.base64,mimeType:image.type,fileName:file.name});
+      if(!saved.ok) throw new Error(saved.error || 'Não foi possível salvar a foto.');
+      setAvatar(document.getElementById('patient-avatar'),saved.avatarDataUrl);
+      document.querySelectorAll('.feed-author-avatar').forEach(el=>setAvatar(el,saved.avatarDataUrl));
+    }catch(err){ alert(err.message || 'Não foi possível salvar a foto.'); }
+    e.target.value='';
+  });
+  function prepareCommunityImage(file){
+    return new Promise((resolve,reject)=>{
+      if(!/^image\/(jpeg|png|webp)$/.test(file.type)){ reject(new Error('Escolha uma imagem JPG, PNG ou WebP.')); return; }
+      const reader=new FileReader(); reader.onerror=()=>reject(new Error('Não foi possível ler a imagem.'));
+      reader.onload=()=>{
+        const img=new Image(); img.onerror=()=>reject(new Error('Arquivo de imagem inválido.'));
+        img.onload=()=>{
+          const scale=Math.min(1,1600/Math.max(img.width,img.height));
+          const canvas=document.createElement('canvas'); canvas.width=Math.round(img.width*scale); canvas.height=Math.round(img.height*scale);
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          const mime=file.type==='image/png'?'image/png':'image/jpeg';
+          canvas.toBlob(blob=>{
+            if(!blob || blob.size>3*1024*1024){ reject(new Error('A imagem deve ter no máximo 3 MB.')); return; }
+            const fr=new FileReader(); fr.onload=()=>resolve({base64:String(fr.result).split(',')[1],type:mime}); fr.onerror=()=>reject(new Error('Não foi possível preparar a imagem.')); fr.readAsDataURL(blob);
+          },mime,mime==='image/jpeg'?0.84:undefined);
+        }; img.src=reader.result;
+      }; reader.readAsDataURL(file);
+    });
+  }
+
   /* ── Confere de tempos em tempos se o cadastro ainda existe na planilha —
      se a Regiane excluir a paciente, o site desloga sozinho. ── */
   if(apiConfigured() && loggedInEmail && !isImpersonating){
@@ -629,6 +650,10 @@
     document.getElementById('program-progress-section').style.display = isConsultaDupla ? 'none' : '';
 
     if(d.nome) document.getElementById('hello-title').textContent = 'Olá, ' + d.nome.split(' ')[0] + ' 🌿';
+    if(d.avatarDataUrl){
+      setAvatar(document.getElementById('patient-avatar'),d.avatarDataUrl);
+      document.querySelectorAll('.feed-author-avatar').forEach(el=>setAvatar(el,d.avatarDataUrl));
+    }
     document.getElementById('stat-dias').textContent = d.diasAcompanhamento;
     document.getElementById('stat-retornos').textContent = d.retornosRealizados;
     document.getElementById('stat-receitas').textContent = d.receitasSalvas;
@@ -914,6 +939,15 @@
   });
 
   /* ── COMUNIDADE: comentários autenticados e persistentes ── */
+  function appendCommunityComment(wrap,c){
+    const el=document.createElement('div'); el.className='feed-comment api-comment';
+    const avatar=document.createElement('div'); avatar.className='fc-avatar'; setAvatar(avatar,c.avatarDataUrl);
+    const body=document.createElement('div'); const name=document.createElement('span'); name.className='fc-name'; name.textContent=c.nome || 'Paciente';
+    const text=document.createElement('span'); text.className='fc-text'; text.textContent=c.texto || '';
+    body.append(name,text); el.append(avatar,body);
+    if(c.imageDataUrl){ const image=document.createElement('img'); image.className='feed-photo'; image.alt='Imagem compartilhada na comunidade'; image.src=c.imageDataUrl; el.appendChild(image); }
+    wrap.appendChild(el);
+  }
   async function loadComments(){
     if(!apiConfigured() || !patientIdToken) return;
     for(const id of [1,2]){
@@ -921,14 +955,7 @@
       if(!res.ok) continue;
       const wrap = document.getElementById('feed-comments-'+id);
       wrap.querySelectorAll('.api-comment').forEach(el=>el.remove());
-      res.comments.forEach(c=>{
-        const el = document.createElement('div');
-        el.className = 'feed-comment api-comment';
-        el.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
-        el.querySelector('.fc-name').textContent = c.nome;
-        el.querySelector('.fc-text').textContent = c.texto;
-        wrap.appendChild(el);
-      });
+      res.comments.forEach(c=>appendCommunityComment(wrap,c));
     }
     if(window.__rebindCursor) window.__rebindCursor();
   }
@@ -936,20 +963,21 @@
   async function postComment(id){
     const input = document.getElementById('feed-input-'+id);
     const text = input.value.trim();
-    if(!text) return;
+    const fileInput=document.getElementById('feed-image-'+id);
+    const file=fileInput.files && fileInput.files[0];
+    if(!text && !file) return;
     const wrap = document.getElementById('feed-comments-'+id);
 
     if(isImpersonating){ alert('No modo “Ver como paciente”, a administradora pode visualizar, mas não publicar em nome da paciente.'); return; }
     if(apiConfigured() && patientEmail && patientIdToken){
-      const res = await apiPost('comment', { idToken: patientIdToken, email: patientEmail, postId: id, texto: text });
+      let image={};
+      try{ if(file){ const prepared=await prepareCommunityImage(file); image={fileBase64:prepared.base64,mimeType:prepared.type,fileName:file.name}; } }
+      catch(err){ alert(err.message || 'Não foi possível preparar a imagem.'); return; }
+      const res = await apiPost('comment', { idToken: patientIdToken, email: patientEmail, postId: id, texto: text, ...image });
       if(!res.ok){ alert(res.error || 'Não foi possível enviar o comentário.'); return; }
-      const c = document.createElement('div');
-      c.className = 'feed-comment api-comment';
-      c.innerHTML = `<div class="fc-avatar"></div><div><span class="fc-name"></span><span class="fc-text"></span></div>`;
-      c.querySelector('.fc-name').textContent = res.nome || 'Você';
-      c.querySelector('.fc-text').textContent = text;
-      wrap.appendChild(c);
+      appendCommunityComment(wrap,{nome:res.nome || 'Você',texto:text,imageDataUrl:res.imageDataUrl,avatarDataUrl:res.avatarDataUrl});
       input.value = '';
+      fileInput.value='';
       if(res.pontosAdicionados) loadDashboardData();
       else alert('Comentário salvo. Esta interação não gerou pontos porque era repetida ou o limite diário foi atingido.');
       if(window.__rebindCursor) window.__rebindCursor();

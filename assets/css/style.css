@@ -487,6 +487,8 @@ footer{ background:var(--bg); border-top:1px solid var(--hairline-soft); padding
 .mem-nav a.active{ background:var(--marsala); color:#fff; }
 .mem-user{ padding-top:20px; border-top:1px solid var(--hairline-soft); display:flex; align-items:center; gap:12px; }
 .mem-avatar{ width:38px; height:38px; border-radius:50%; background:linear-gradient(160deg,var(--rose) 0%,var(--marsala) 100%); flex-shrink:0; }
+.mem-avatar.has-photo,.fc-avatar.has-photo{ background-size:cover; background-position:center; background-repeat:no-repeat; }
+#patient-avatar{ cursor:pointer; }
 .mem-user-name{ font-size:13px; font-weight:700; color:var(--ink); }
 .mem-user-role{ font-size:11px; color:var(--muted); }
 .mem-logout{ margin-left:auto; font-size:11px; color:var(--muted); text-decoration:none; cursor:none; }
@@ -525,10 +527,13 @@ footer{ background:var(--bg); border-top:1px solid var(--hairline-soft); padding
 .feed-name{ font-size:13.5px; font-weight:700; color:var(--ink); }
 .feed-time{ font-size:11px; color:var(--muted); }
 .feed-text{ font-size:14px; color:var(--ink-soft); line-height:1.6; margin-bottom:14px; }
-.feed-photo{ width:100%; max-width:260px; aspect-ratio:4/3; border-radius:12px; background:linear-gradient(150deg,var(--rose-mist) 0%,var(--rose-soft) 100%); margin-bottom:14px; }
+.feed-photo{ display:block; width:100%; max-width:340px; max-height:360px; object-fit:cover; border-radius:12px; margin-top:10px; }
 .feed-comments{ border-top:1px solid var(--hairline-soft); padding-top:12px; margin-top:4px; }
 .feed-comment{ display:flex; gap:10px; margin-bottom:10px; font-size:13px; }
 .feed-comment .fc-avatar{ width:26px; height:26px; border-radius:50%; background:linear-gradient(160deg,var(--rose) 0%,var(--marsala) 100%); flex-shrink:0; }
+.feed-comment{ flex-wrap:wrap; }
+.feed-comment>div:nth-child(2){ flex:1; min-width:0; }
+.feed-image-button{ display:inline-flex; align-items:center; white-space:nowrap; color:var(--marsala); font-size:12px; font-weight:700; cursor:pointer; }
 .feed-comment .fc-name{ font-weight:700; color:var(--ink); margin-right:6px; }
 .feed-comment .fc-text{ color:var(--ink-soft); }
 .feed-input-row{ display:flex; gap:10px; margin-top:12px; }

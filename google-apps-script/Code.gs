@@ -79,7 +79,7 @@ function normalizeInstagramPostKey_(value) {
 
 function ensurePatientInstagramHeader_() {
   const sheet = getSheet('Pacientes');
-  ensureHeaders_(sheet, ['Instagram', 'Servico']);
+  ensureHeaders_(sheet, ['Instagram', 'Servico', 'GoogleFotoUrl', 'FotoPerfilFileId', 'FotoPerfilMimeType']);
   return sheet;
 }
 
@@ -101,7 +101,7 @@ function ensureGamificationSheets_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let comentarios = ss.getSheetByName('Comentarios');
   if (!comentarios) comentarios = ss.insertSheet('Comentarios');
-  ensureHeaders_(comentarios, ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos']);
+  ensureHeaders_(comentarios, ['Id', 'PostId', 'Email', 'Nome', 'Texto', 'DataHora', 'AvisoEnviadoEm', 'StatusAviso', 'PontosConcedidos', 'ImageDriveFileId', 'ImageMimeType']);
 
   let pontos = ss.getSheetByName('PontosLog');
   if (!pontos) pontos = ss.insertSheet('PontosLog');
@@ -153,7 +153,7 @@ function verifyGoogleToken(idToken) {
   if (info.error) throw new Error('Token do Google inválido: ' + info.error);
   if (info.aud !== GOOGLE_CLIENT_ID) throw new Error('Token não pertence a este app.');
   if (info.email_verified !== 'true' && info.email_verified !== true) throw new Error('E-mail do Google não verificado.');
-  return { email: normEmail(info.email), nome: info.name || info.email };
+  return { email: normEmail(info.email), nome: info.name || info.email, picture: info.picture || '' };
 }
 
 /**
@@ -220,6 +220,7 @@ function doPost(e) {
     if (action === 'patientMaterialFile') return jsonResponse(actionPatientMaterialFile(body));
     if (action === 'patientComments') return jsonResponse(actionComments(body));
     if (action === 'comment') return jsonResponse(actionAddComment(body));
+    if (action === 'savePatientAvatar') return jsonResponse(actionSavePatientAvatar(body));
     if (action === 'bookSlot') return jsonResponse(actionBookSlot(body));
     if (action === 'checkAccess') return jsonResponse(actionCheckAccess(body));
     if (action === 'googleLoginPrograma') return jsonResponse(actionGoogleLoginPrograma(body));
@@ -352,6 +353,11 @@ function actionGoogleLoginPrograma(body) {
   if (!p) {
     return { ok: false, error: 'Não encontramos seu cadastro no Programa com esta conta Google. Fale com a Regiane.' };
   }
+  if (auth.picture && !p.GoogleFotoUrl) {
+    const patientSheet = ensurePatientInstagramHeader_();
+    const headers = patientSheet.getRange(1, 1, 1, patientSheet.getLastColumn()).getValues()[0];
+    patientSheet.getRange(p._row, headers.indexOf('GoogleFotoUrl') + 1).setValue(auth.picture);
+  }
   return { ok: true, nome: p.Nome, email: p.Email };
 }
 
@@ -372,6 +378,7 @@ function actionDashboard(email) {
   }
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
   const servico = resolvePatientProgram_(p);
+  const avatar = patientAvatarData_(p);
 
   const materiais = getAvailableMaterialsForPatient_('programa', email, p.DataInicio);
 
@@ -395,6 +402,7 @@ function actionDashboard(email) {
   return {
     ok: true,
     nome: p.Nome,
+    avatarDataUrl: avatar,
     servico: patientProgramLabel_(servico),
     diasAcompanhamento: daysSince(p.DataInicio),
     retornosRealizados: Number(p.RetornosRealizados) || 0,
@@ -1260,8 +1268,50 @@ function actionComments(body) {
   const filtered = postId ? all.filter(c => String(c.PostId) === String(postId)) : all;
   return {
     ok: true,
-    comments: filtered.map(c => ({ id: String(c.Id), nome: c.Nome, texto: c.Texto, dataHora: c.DataHora }))
+    comments: filtered.map(c => ({ id: String(c.Id), nome: c.Nome, texto: c.Texto, dataHora: c.DataHora,
+      imageDataUrl: communityFileData_(c.ImageDriveFileId, c.ImageMimeType), avatarDataUrl: patientAvatarData_(findPatientRow(c.Email)) }))
   };
+}
+
+function patientAvatarData_(patient) {
+  if (!patient) return '';
+  if (patient.FotoPerfilFileId) return communityFileData_(patient.FotoPerfilFileId, patient.FotoPerfilMimeType);
+  const url = String(patient.GoogleFotoUrl || '');
+  return /^https:\/\/lh3\.googleusercontent\.com\//i.test(url) ? url : '';
+}
+
+function communityFileData_(fileId, mimeType) {
+  if (!fileId) return '';
+  try {
+    const blob = DriveApp.getFileById(String(fileId)).getBlob();
+    const type = String(mimeType || blob.getContentType() || '');
+    if (!/^image\/(jpeg|png|webp)$/i.test(type)) return '';
+    return 'data:' + type + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (err) { return ''; }
+}
+
+function storeCommunityImage_(base64, mimeType, fileName) {
+  const type = String(mimeType || '').toLowerCase();
+  if (!/^image\/(jpeg|png|webp)$/.test(type)) throw new Error('Use uma imagem JPG, PNG ou WebP.');
+  const clean = String(base64 || '').replace(/^data:[^,]+,/, '');
+  if (!clean || clean.length > 4 * 1024 * 1024) throw new Error('A imagem deve ter no mÃ¡ximo 3 MB.');
+  const bytes = Utilities.base64Decode(clean);
+  if (!bytes.length || bytes.length > 3 * 1024 * 1024) throw new Error('A imagem deve ter no mÃ¡ximo 3 MB.');
+  const safeName = String(fileName || 'imagem').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 100);
+  const file = DriveApp.createFile(Utilities.newBlob(bytes, type, safeName));
+  return { id: file.getId(), mimeType: type };
+}
+
+function actionSavePatientAvatar(body) {
+  const email = patientEmailFromToken_(body);
+  const patient = findPatientRow(email);
+  if (!patient) return { ok: false, error: 'Paciente nÃ£o encontrada.' };
+  const stored = storeCommunityImage_(body.fileBase64, body.mimeType, body.fileName || 'foto-perfil');
+  const sheet = ensurePatientInstagramHeader_();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.getRange(patient._row, headers.indexOf('FotoPerfilFileId') + 1).setValue(stored.id);
+  sheet.getRange(patient._row, headers.indexOf('FotoPerfilMimeType') + 1).setValue(stored.mimeType);
+  return { ok: true, avatarDataUrl: communityFileData_(stored.id, stored.mimeType) };
 }
 
 function actionCommentsLegacy_(postId) {
@@ -1275,8 +1325,10 @@ function actionAddComment(body) {
   const p = findPatientRow(email);
   if (!p) return { ok: false, error: 'Paciente não encontrada.' };
   const texto = String(body.texto || '').trim();
-  if (!texto) return { ok: false, error: 'Comentário vazio.' };
+  const hasImage = !!body.fileBase64;
+  if (!texto && !hasImage) return { ok: false, error: 'Escreva um comentário ou escolha uma imagem.' };
   if (texto.length > 1000) return { ok: false, error: 'O comentário deve ter no máximo 1.000 caracteres.' };
+  const storedImage = hasImage ? storeCommunityImage_(body.fileBase64, body.mimeType, body.fileName || 'comunidade') : null;
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -1295,7 +1347,7 @@ function actionAddComment(body) {
 
     id = 'comentario-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
     pontosConcedidos = (!duplicadoRecente && comentariosHoje < 10) ? 3 : 0;
-    sheets.comentarios.appendRow([id, body.postId, email, p.Nome, texto, new Date(), '', 'Pendente', pontosConcedidos]);
+    sheets.comentarios.appendRow([id, body.postId, email, p.Nome, texto, new Date(), '', 'Pendente', pontosConcedidos, storedImage ? storedImage.id : '', storedImage ? storedImage.mimeType : '']);
     row = sheets.comentarios.getLastRow();
     if (pontosConcedidos) addPointsUnlocked_(email, 'Comentário na comunidade', pontosConcedidos, id);
   } finally {
@@ -1304,13 +1356,14 @@ function actionAddComment(body) {
 
   const enviado = notifyRegiane(
     'Novo comentário ou dúvida — ' + (p.Nome || email),
-    (p.Nome || email) + ' (' + email + ') escreveu na comunidade:\n\n' + texto + '\n\nAcesse o painel da área de membros para acompanhar.'
+    (p.Nome || email) + ' (' + email + ') publicou na comunidade:\n\n' + (texto || 'Enviou uma imagem.') + '\n\nAcesse o painel da área de membros para acompanhar.'
   );
   const comentarios = ensureGamificationSheets_().comentarios;
   comentarios.getRange(row, 7).setValue(enviado ? new Date() : '');
   comentarios.getRange(row, 8).setValue(enviado ? 'Enviado' : 'Erro no envio');
 
-  return { ok: true, id: id, nome: p.Nome, pontosAdicionados: pontosConcedidos, avisoRegianeEnviado: enviado };
+  return { ok: true, id: id, nome: p.Nome, pontosAdicionados: pontosConcedidos, avisoRegianeEnviado: enviado,
+    imageDataUrl: storedImage ? communityFileData_(storedImage.id, storedImage.mimeType) : '', avatarDataUrl: patientAvatarData_(findPatientRow(email)) };
 }
 
 function addPointsUnlocked_(email, tipo, pontos, chaveUnica) {
