@@ -939,7 +939,10 @@
     card.querySelector('.video-cat').textContent = m.tipo || 'Vídeo';
     card.querySelector('.video-title').textContent = m.titulo || '';
     card.style.cursor = 'none';
-    card.addEventListener('click', ()=> openVideoModal(m.link, m.titulo));
+    card.addEventListener('click', ()=>{
+      openVideoModal(m.link, m.titulo);
+      if(m.id) apiPost('patientTrackMaterial', { idToken: patientIdToken, email: patientEmail, area: 'programa', materialId: m.id });
+    });
     return card;
   }
 
