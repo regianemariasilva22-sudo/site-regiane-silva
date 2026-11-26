@@ -100,19 +100,19 @@
 
       <div class="mem-stats">
         <div class="mem-stat reveal in">
-          <div class="num" id="stat-dias">42</div>
+          <div class="num" id="stat-dias">0</div>
           <div class="lbl">Dias de acompanhamento</div>
         </div>
         <div class="mem-stat reveal in d1">
-          <div class="num" id="stat-retornos">3</div>
+          <div class="num" id="stat-retornos">0</div>
           <div class="lbl">Retornos realizados</div>
         </div>
         <div class="mem-stat reveal in d2">
-          <div class="num" id="stat-receitas">12</div>
+          <div class="num" id="stat-receitas">0</div>
           <div class="lbl">Receitas salvas</div>
         </div>
         <div class="mem-stat reveal in d3" id="stat-progresso-card">
-          <div class="num" id="stat-progresso">78%</div>
+          <div class="num" id="stat-progresso">0%</div>
           <div class="lbl" id="stat-progresso-label">Progresso do programa</div>
         </div>
       </div>
@@ -204,15 +204,15 @@
 
       <div class="mem-stats">
         <div class="mem-stat reveal in">
-          <div class="num" id="pontos-total">340</div>
+          <div class="num" id="pontos-total">0</div>
           <div class="lbl">Pontos acumulados</div>
         </div>
         <div class="mem-stat reveal in d1">
-          <div class="num" id="pontos-comentarios">7</div>
+          <div class="num" id="pontos-comentarios">0</div>
           <div class="lbl">Comentários e envios na comunidade</div>
         </div>
         <div class="mem-stat reveal in d2">
-          <div class="num" id="pontos-credito">R$ 34</div>
+          <div class="num" id="pontos-credito">R$ 0</div>
           <div class="lbl">Crédito disponível</div>
         </div>
       </div>
@@ -259,7 +259,7 @@
         </div>
         <div class="mem-panel reveal in d1">
           <h3>Meta do próximo crédito</h3>
-          <p class="card-text">Faltam <strong id="pontos-faltam">60 pontos</strong> para o seu próximo crédito de R$10.</p>
+          <p class="card-text">Faltam <strong id="pontos-faltam">100 pontos</strong> para o seu próximo crédito de R$10.</p>
           <div class="mem-progress-bar" style="margin-top:14px;"><div class="mem-progress-fill" id="pontos-bar" style="width:85%;"></div></div>
           <p class="card-text" style="margin-top:14px;">Crédito gerado: <strong id="pontos-credito-gerado">R$ 0</strong> · já utilizado: <strong id="pontos-credito-usado">R$ 0</strong></p>
         </div>
@@ -683,7 +683,7 @@
       row.style.cursor='pointer';row.addEventListener('click',()=>{if(activity.tipo==='comunidade')showTab('comunidade');else if(activity.tipo==='live'){if(activity.link)window.open(activity.link,'_blank','noopener');else showTab('comunidade');}else{showTab('materiais');if(activity.link)window.open(activity.link,'_blank','noopener');}});wrap.appendChild(row);});
   }
   async function loadDashboardData(){
-    if(!apiConfigured() || !patientEmail || !patientIdToken) return;
+    if(!apiConfigured() || !patientEmail || !patientIdToken){ window.location.replace('login.html'); return; }
     const d = await apiPost('patientDashboard', { idToken: patientIdToken, email: patientEmail });
     if(!d.ok) return;
     pendingAppointmentStatusRefresh = d.agendamentoStatus === 'solicitado';
