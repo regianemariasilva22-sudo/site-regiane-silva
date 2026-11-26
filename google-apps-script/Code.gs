@@ -586,15 +586,21 @@ function migrateLegacyRecipeSaves_() {
 function refreshMaterialEngagementDashboard_() {
   const records = sheetToObjects(ensureMaterialEngagementSheet_());
   const byMaterial = {};
+  const byCategory = {};
   const byPatient = {};
   const patientRows = sheetToObjects(getSheet('Pacientes'));
   const consultoriaRows = sheetToObjects(getSheet('ConsultoriaPacientes'));
   records.forEach(function(row) {
     const email = normEmail(row.Email);
     const key = String(row.Area || 'materiais') + '|' + String(row.MaterialId || '');
+    const categoryKey = String(row.Area || 'materiais') + '|' + String(row.Categoria || 'Material');
     if (!byMaterial[key]) byMaterial[key] = { title:row.Titulo || row.MaterialId, category:row.Categoria || 'Material', area:row.Area || 'materiais', patients:{}, accesses:0 };
     byMaterial[key].patients[email] = true;
     byMaterial[key].accesses += Number(row.TotalAcessos) || 1;
+    if (!byCategory[categoryKey]) byCategory[categoryKey] = { category:row.Categoria || 'Material', area:row.Area || 'materiais', materials:{}, patients:{}, accesses:0 };
+    byCategory[categoryKey].materials[key] = true;
+    byCategory[categoryKey].patients[email] = true;
+    byCategory[categoryKey].accesses += Number(row.TotalAcessos) || 1;
     if (!byPatient[email]) byPatient[email] = { name:row.Nome || email, ids:{}, accesses:0, titles:{} };
     byPatient[email].ids[key] = true;
     byPatient[email].accesses += Number(row.TotalAcessos) || 1;
@@ -604,6 +610,10 @@ function refreshMaterialEngagementDashboard_() {
     const item = byMaterial[key];
     return [item.title, item.category, item.area, Object.keys(item.patients).length, item.accesses];
   }).sort(function(a,b) { return b[3] - a[3] || b[4] - a[4] || String(a[0]).localeCompare(String(b[0])); });
+  const categories = Object.keys(byCategory).map(function(key) {
+    const item = byCategory[key];
+    return [item.category, item.area, Object.keys(item.materials).length, Object.keys(item.patients).length, item.accesses];
+  }).sort(function(a,b) { return b[3] - a[3] || b[4] - a[4] || String(a[0]).localeCompare(String(b[0])); });
   const patients = Object.keys(byPatient).map(function(email) {
     const item = byPatient[email];
     const source = patientRows.filter(function(p) { return normEmail(p.Email) === email; })[0];
@@ -612,15 +622,21 @@ function refreshMaterialEngagementDashboard_() {
     return [item.name, email, service, Object.keys(item.ids).length, item.accesses, Object.keys(item.titles).sort().join(' · ')];
   }).sort(function(a,b) { return b[3] - a[3] || String(a[0]).localeCompare(String(b[0])); });
   const dashboard = getSheet('Dashboard');
-  dashboard.getRange(46, 1, 1, 5).setValues([['ENGAJAMENTO DE RECEITAS E MATERIAIS', '', '', '', '']]);
-  dashboard.getRange(47, 1, 1, 5).setValues([['Material', 'Categoria', 'Área', 'Pacientes únicos', 'Acessos / salvamentos']]);
-  if (materials.length) dashboard.getRange(48, 1, materials.length, 5).setValues(materials);
-  else dashboard.getRange(48, 1, 1, 5).setValues([['Nenhum salvamento ou acesso registrado', '', '', 0, 0]]);
+  dashboard.getRange(46, 1, 1, 5).setValues([['ENGAJAMENTO POR CATEGORIA', '', '', '', '']]);
+  dashboard.getRange(47, 1, 1, 5).setValues([['Categoria', 'Área', 'Materiais únicos', 'Pacientes únicos', 'Acessos / salvamentos']]);
+  if (categories.length) dashboard.getRange(48, 1, categories.length, 5).setValues(categories);
+  else dashboard.getRange(48, 1, 1, 5).setValues([['Nenhum acesso registrado', '', 0, 0, 0]]);
+  const materialTitleRow = 50 + Math.max(0, categories.length - 1);
+  dashboard.getRange(materialTitleRow, 1, 1, 5).setValues([['ENGAJAMENTO POR RECEITA E MATERIAL', '', '', '', '']]);
+  dashboard.getRange(materialTitleRow + 1, 1, 1, 5).setValues([['Material', 'Categoria', 'Área', 'Pacientes únicos', 'Acessos / salvamentos']]);
+  if (materials.length) dashboard.getRange(materialTitleRow + 2, 1, materials.length, 5).setValues(materials);
+  else dashboard.getRange(materialTitleRow + 2, 1, 1, 5).setValues([['Nenhum salvamento ou acesso registrado', '', '', 0, 0]]);
   dashboard.getRange(46, 7, 1, 6).setValues([['ENGAJAMENTO POR PACIENTE', '', '', '', '', '']]);
   dashboard.getRange(47, 7, 1, 6).setValues([['Paciente', 'E-mail', 'Serviço', 'Materiais únicos', 'Acessos / salvamentos', 'Materiais']]);
   if (patients.length) dashboard.getRange(48, 7, patients.length, 6).setValues(patients);
   else dashboard.getRange(48, 7, 1, 6).setValues([['Nenhum salvamento ou acesso registrado', '', '', 0, 0, '']]);
   dashboard.getRange(46, 1, 2, 5).setFontWeight('bold');
+  dashboard.getRange(materialTitleRow, 1, 2, 5).setFontWeight('bold');
   dashboard.getRange(46, 7, 2, 6).setFontWeight('bold');
 }
 
