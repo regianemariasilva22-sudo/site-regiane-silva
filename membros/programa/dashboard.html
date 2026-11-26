@@ -569,9 +569,10 @@
 
   function setAvatar(el, src){
     if(!el) return;
-    if(src){ el.style.backgroundImage = `url("${src}")`; el.classList.add('has-photo'); }
+    if(src){ el.style.backgroundImage = `url("${src}")`; el.classList.add('has-photo'); el.classList.remove('avatar-initials'); }
     else { el.style.backgroundImage = ''; el.classList.remove('has-photo'); }
   }
+  function setAvatarInitials(el,name){if(!el)return;setAvatar(el,'');el.classList.add('avatar-initials');el.textContent=initials(name);}
   document.getElementById('patient-avatar').addEventListener('click', ()=>{
     if(!isImpersonating) document.getElementById('patient-avatar-file').click();
   });
@@ -662,9 +663,11 @@
   function initials(name){return String(name||'').trim().split(/[\s-]+/).filter(Boolean).slice(0,2).map(part=>part.charAt(0).toUpperCase()).join('')||'?';}
   function renderCommunityParticipants(people){
     const wrap=document.getElementById('community-participant-avatars');if(!wrap)return;wrap.innerHTML='';
-    (people||[]).forEach(person=>{const avatar=document.createElement('span');avatar.title=person.nome||'Participante';avatar.setAttribute('aria-label',person.nome||'Participante');avatar.style.cssText='display:inline-flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:10px;font-weight:700;';setAvatar(avatar,person.avatarDataUrl);if(!person.avatarDataUrl)avatar.textContent=initials(person.nome);wrap.appendChild(avatar);});
-    document.querySelectorAll('.feed-post[data-post-id]').forEach(post=>{const name=post.querySelector('.feed-name')?.textContent||'';const avatar=post.querySelector('.feed-author-avatar');if(!avatar)return;const participant=(people||[]).find(person=>String(person.nome||'').trim().toLowerCase()===name.trim().toLowerCase());setAvatar(avatar,participant&&participant.avatarDataUrl);avatar.textContent=participant&&participant.avatarDataUrl?'':initials(name);});
+    (people||[]).forEach(person=>{const avatar=document.createElement('span');avatar.title=person.nome||'Participante';avatar.setAttribute('aria-label',person.nome||'Participante');avatar.style.cssText='overflow:hidden;';if(person.avatarDataUrl)setAvatar(avatar,person.avatarDataUrl);else setAvatarInitials(avatar,person.nome);wrap.appendChild(avatar);});
+    document.querySelectorAll('.feed-post[data-post-id]').forEach(post=>{const name=post.querySelector('.feed-name')?.textContent||'';const avatar=post.querySelector('.feed-author-avatar');if(!avatar)return;const participant=(people||[]).find(person=>String(person.nome||'').trim().toLowerCase()===name.trim().toLowerCase());if(participant&&participant.avatarDataUrl)setAvatar(avatar,participant.avatarDataUrl);else setAvatarInitials(avatar,name);});
   }
+  function initialiseDemoCommunityAvatars(){document.querySelectorAll('.feed-post[data-post-id]').forEach(post=>{const avatar=post.querySelector('.feed-author-avatar');const name=post.querySelector('.feed-name')?.textContent||'';if(avatar&&!avatar.classList.contains('has-photo'))setAvatarInitials(avatar,name);});}
+  initialiseDemoCommunityAvatars();
   function isRecipeMaterialForUi(material){return /(receita|bolinho|geleia|biscoito|batata|sopa|bowl|overnight|frango|lanchinho|lanche)/i.test([material.titulo,material.categoria,material.tipo].join(' '));}
   function renderSavedRecipes(recipes,materials){
     const wrap=document.getElementById('saved-recipes-list');wrap.innerHTML='';const saved=[...(recipes||[]).map(item=>({...item,legacy:true})),...(materials||[]).map(item=>({...item,legacy:false}))];
@@ -1014,7 +1017,7 @@
   /* ── COMUNIDADE: comentários autenticados e persistentes ── */
   function appendCommunityComment(wrap,c){
     const el=document.createElement('div'); el.className='feed-comment api-comment';
-    const avatar=document.createElement('div'); avatar.className='fc-avatar'; setAvatar(avatar,c.avatarDataUrl);
+    const avatar=document.createElement('div'); avatar.className='fc-avatar'; if(c.avatarDataUrl)setAvatar(avatar,c.avatarDataUrl);else setAvatarInitials(avatar,c.nome||'Paciente');
     const body=document.createElement('div'); const name=document.createElement('span'); name.className='fc-name'; name.textContent=c.nome || 'Paciente';
     const text=document.createElement('span'); text.className='fc-text'; text.textContent=c.texto || '';
     body.append(name,text); el.append(avatar,body);
@@ -1032,7 +1035,7 @@
     const root=document.getElementById('community-new-posts'),id=String(post.id||''),safeId=id.replace(/[^a-zA-Z0-9_-]/g,'');
     if(!safeId||document.getElementById('community-post-'+safeId))return null;
     const card=document.createElement('article');card.className='feed-post api-community-post';card.id='community-post-'+safeId;
-    const head=document.createElement('div');head.className='feed-head';const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;';setAvatar(avatar,post.avatarDataUrl);
+    const head=document.createElement('div');head.className='feed-head';const avatar=document.createElement('div');avatar.className='mem-avatar';avatar.style.cssText='width:34px;height:34px;';if(post.avatarDataUrl)setAvatar(avatar,post.avatarDataUrl);else setAvatarInitials(avatar,post.nome||'Paciente');
     const identity=document.createElement('div'),name=document.createElement('div'),time=document.createElement('div');name.className='feed-name';name.textContent=post.nome||'Paciente';time.className='feed-time';time.textContent=communityTime(post.dataHora);identity.append(name,time);head.append(avatar,identity);card.appendChild(head);
     if(post.texto){const text=document.createElement('p');text.className='feed-text';text.textContent=post.texto;card.appendChild(text);}
     if(post.imageDataUrl){const image=document.createElement('img');image.className='feed-photo';image.alt='Imagem compartilhada na comunidade';image.src=post.imageDataUrl;card.appendChild(image);}
@@ -1327,6 +1330,7 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;">
           <button type="button" class="btn btn-primary btn-sm admin-plano-save">Salvar plano</button>
           <a class="btn btn-outline btn-sm" href="dashboard.html?as=${encodeURIComponent(p.email)}">Ver como paciente &nbsp;→</a>
+          <button type="button" class="btn btn-outline btn-sm admin-patient-reset">Resetar paciente</button>
           <button type="button" class="btn btn-outline btn-sm admin-patient-remove">Remover paciente</button>
           <span class="admin-plano-status" style="font-size:12.5px;color:var(--muted);"></span>
         </div>
@@ -1405,6 +1409,17 @@
         if(!confirm('Remover o acesso desta paciente? Os registros complementares serão preservados.')) return;
         const removed = await apiPost('adminRemovePatient', { idToken: patientIdToken, email: p.email });
         if(removed.ok) loadAdminPatients(); else status.textContent = removed.error || 'Erro ao remover.';
+      });
+      card.querySelector('.admin-patient-reset').addEventListener('click', async ()=>{
+        const warning='Resetar '+(p.nome||p.email)+' apaga o histórico de acompanhamento: comentários e fotos da comunidade, pontos/créditos, materiais salvos, metas/notificações e solicitações pendentes de agenda. Cadastro, perfil/foto, plano alimentar, confirmações de agenda e financeiro serão preservados. Para continuar, digite RESETAR.';
+        const firstConfirmation=window.confirm(warning+' Esta ação não pode ser desfeita. Deseja continuar?');
+        if(!firstConfirmation)return;
+        const confirmation=window.prompt('Digite RESETAR para confirmar a limpeza do histórico de '+(p.nome||p.email)+'.','');
+        if(confirmation!=='RESETAR')return;
+        const resetButton=card.querySelector('.admin-patient-reset');resetButton.disabled=true;status.textContent='Resetando acompanhamento...';
+        const result=await apiPost('adminResetPatient',{idToken:patientIdToken,email:p.email,confirmation});
+        if(result.ok){status.textContent='Acompanhamento resetado. Cadastro, plano e financeiro preservados.';loadAdminPatients();}
+        else{resetButton.disabled=false;status.textContent=result.error||'Não foi possível resetar.';}
       });
       saveBtn.addEventListener('click', async ()=>{
         saveBtn.disabled = true;

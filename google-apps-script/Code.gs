@@ -254,6 +254,7 @@ function doPost(e) {
     if (action === 'adminListPatients') return jsonResponse(actionAdminListPatients(body));
     if (action === 'adminAddPatient') return jsonResponse(actionAdminAddPatient(body));
     if (action === 'adminRemovePatient') return jsonResponse(actionAdminRemovePatient(body));
+    if (action === 'adminResetPatient') return jsonResponse(actionAdminResetPatient(body));
     if (action === 'adminSavePlan') return jsonResponse(actionAdminSavePlan(body));
     if (action === 'adminUploadPlanPdf') return jsonResponse(actionAdminUploadPlanPdf(body));
     if (action === 'adminAddMaterial') return jsonResponse(actionAdminAddMaterial(body));
@@ -611,6 +612,8 @@ function actionSaveMaterial(body) {
   if (email !== normEmail(viewerEmail) || isAdmin(viewerEmail)) return { ok:false, error:'Somente a própria paciente pode salvar materiais.' };
   const patient = findPatientRow(email);
   if (!patient) return { ok:false, error:'Paciente não encontrada.' };
+  if (isAdmin(email)) return { ok:false, error:'Não é permitido resetar uma conta administrativa.' };
+  if (isAdmin(email)) return { ok:false, error:'Não é permitido resetar uma conta administrativa.' };
   const materialId = String(body.materialId || '').trim();
   if (!materialId) return { ok:false, error:'Material inválido.' };
   const material = getAvailableMaterialsForPatient_('programa', email, patient.DataInicio).filter(function(item) {
@@ -1172,6 +1175,52 @@ function actionAdminRemovePatient(body) {
     }
   }
   return { ok: false, error: 'Paciente não encontrada.' };
+}
+
+function actionAdminResetPatient(body) {
+  assertAdmin(body.idToken);
+  const email = normEmail(body.email);
+  if (!email || String(body.confirmation || '') !== 'RESETAR') return { ok:false, error:'Confirmação inválida.' };
+  const patient = findPatientRow(email);
+  if (!patient) return { ok:false, error:'Paciente não encontrada.' };
+  if (isAdmin(email)) return { ok:false, error:'Não é permitido resetar uma conta administrativa.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const patientSheet = ensurePatientInstagramHeader_();
+    const headers = patientSheet.getRange(1, 1, 1, patientSheet.getLastColumn()).getValues()[0].map(String);
+    const resetFields = {
+      DataInicio:new Date(), RetornosRealizados:0, ReceitasSalvas:0, ProgressoPercent:0,
+      ProximoRetornoData:'', ProximoRetornoHora:'', PontosTotal:0, ReceitasSalvasIds:'', MateriaisSalvosIds:''
+    };
+    Object.keys(resetFields).forEach(function(header) {
+      const col = headers.indexOf(header);
+      if (col >= 0) patientSheet.getRange(patient._row, col + 1).setValue(resetFields[header]);
+    });
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    ['Comentarios', 'Fotos', 'PontosLog', 'Creditos', 'EngajamentoMateriais', 'Notificacoes', 'Rotinas'].forEach(function(name) {
+      const sheet = ss.getSheetByName(name);
+      if (!sheet || sheet.getLastRow() < 2) return;
+      const rows = sheet.getDataRange().getValues();
+      const emailCol = rows[0].map(String).indexOf('Email');
+      if (emailCol < 0) return;
+      for (let i = rows.length - 1; i >= 1; i--) {
+        if (normEmail(rows[i][emailCol]) === email) sheet.deleteRow(i + 1);
+      }
+    });
+    const bookings = getSheet('Agendamentos');
+    const bookingRows = bookings.getDataRange().getValues();
+    const bookingHeaders = bookingRows[0].map(String);
+    const bookingEmailCol = bookingHeaders.indexOf('Email');
+    const statusCol = bookingHeaders.indexOf('Status');
+    for (let i = bookingRows.length - 1; i >= 1; i--) {
+      if (normEmail(bookingRows[i][bookingEmailCol]) === email && String(bookingRows[i][statusCol] || '').toLowerCase() === 'solicitado') bookings.deleteRow(i + 1);
+    }
+    syncMaterialEngagementDashboard_();
+    return { ok:true, email:email };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
